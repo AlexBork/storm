@@ -867,7 +867,7 @@ void SparseMatrix<ValueType>::makeRowsAbsorbing(storm::storage::BitVector const&
     for (auto row : rows) {
         makeRowDirac(row, row, false);
     }
-    if(dropZeroEntries){
+    if (dropZeroEntries) {
         this->dropZeroEntries();
     }
 }
@@ -885,7 +885,7 @@ void SparseMatrix<ValueType>::makeRowGroupsAbsorbing(storm::storage::BitVector c
             makeRowDirac(rowGroup, rowGroup, false);
         }
     }
-    if(dropZeroEntries){
+    if (dropZeroEntries) {
         this->dropZeroEntries();
     }
 }
@@ -925,7 +925,7 @@ void SparseMatrix<ValueType>::makeRowDirac(index_type row, index_type column, bo
         }
         columnValuePtr->setValue(storm::utility::zero<ValueType>());
     }
-    if(dropZeroEntries){
+    if (dropZeroEntries) {
         this->dropZeroEntries();
     }
 }
@@ -1586,7 +1586,7 @@ void SparseMatrix<ValueType>::deleteDiagonalEntries(bool dropZeroEntries) {
             }
         }
     }
-    if(dropZeroEntries){
+    if (dropZeroEntries) {
         this->dropZeroEntries();
     }
 }
