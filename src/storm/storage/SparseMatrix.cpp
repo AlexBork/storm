@@ -1567,7 +1567,7 @@ void SparseMatrix<ValueType>::negateAllNonDiagonalEntries() {
 }
 
 template<typename ValueType>
-void SparseMatrix<ValueType>::deleteDiagonalEntries() {
+void SparseMatrix<ValueType>::deleteDiagonalEntries(bool dropZeroEntries) {
     // Iterate over all rows and negate all the elements that are not on the diagonal.
     for (index_type group = 0; group < this->getRowGroupCount(); ++group) {
         for (auto& entry : this->getRowGroup(group)) {
@@ -1576,6 +1576,9 @@ void SparseMatrix<ValueType>::deleteDiagonalEntries() {
                 entry.setValue(storm::utility::zero<ValueType>());
             }
         }
+    }
+    if(dropZeroEntries){
+        this->dropZeroEntries();
     }
 }
 

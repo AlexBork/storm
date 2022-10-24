@@ -847,8 +847,10 @@ class SparseMatrix {
 
     /*!
      * Sets all diagonal elements to zero.
+     * @param dropZeroEntries if true, zero entries resulting from the transformation are dropped from the matrix after the transformation.
+     * This action may impact the performance significantly.
      */
-    void deleteDiagonalEntries();
+    void deleteDiagonalEntries(bool dropZeroEntries = false);
 
     /*!
      * Calculates the Jacobi decomposition of this sparse matrix. For this operation, the matrix must be square.
