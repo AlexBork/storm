@@ -668,8 +668,10 @@ class SparseMatrix {
      * This function makes the groups of rows given by the bit vector absorbing.
      *
      * @param rowGroupConstraint A bit vector indicating which row groups to make absorbing.
+     * @param dropZeroEntries if true, zero entries resulting from the transformation are dropped from the matrix after the transformation.
+     * This action may impact the performance significantly.
      */
-    void makeRowGroupsAbsorbing(storm::storage::BitVector const& rowGroupConstraint);
+    void makeRowGroupsAbsorbing(storm::storage::BitVector const& rowGroupConstraint, bool dropZeroEntries = false);
 
     /*!
      * This function makes the given row Dirac. This means that all entries will be set to 0 except the one

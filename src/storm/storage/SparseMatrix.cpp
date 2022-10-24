@@ -873,17 +873,20 @@ void SparseMatrix<ValueType>::makeRowsAbsorbing(storm::storage::BitVector const&
 }
 
 template<typename ValueType>
-void SparseMatrix<ValueType>::makeRowGroupsAbsorbing(storm::storage::BitVector const& rowGroupConstraint) {
+void SparseMatrix<ValueType>::makeRowGroupsAbsorbing(storm::storage::BitVector const& rowGroupConstraint, bool dropZeroEntries) {
     if (!this->hasTrivialRowGrouping()) {
         for (auto rowGroup : rowGroupConstraint) {
             for (index_type row = this->getRowGroupIndices()[rowGroup]; row < this->getRowGroupIndices()[rowGroup + 1]; ++row) {
-                makeRowDirac(row, rowGroup);
+                makeRowDirac(row, rowGroup, false);
             }
         }
     } else {
         for (auto rowGroup : rowGroupConstraint) {
-            makeRowDirac(rowGroup, rowGroup);
+            makeRowDirac(rowGroup, rowGroup, false);
         }
+    }
+    if(dropZeroEntries){
+        this->dropZeroEntries();
     }
 }
 
