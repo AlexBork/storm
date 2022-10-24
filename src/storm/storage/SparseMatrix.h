@@ -675,8 +675,10 @@ class SparseMatrix {
      *
      * @param row The row to be made Dirac.
      * @param column The index of the column whose value is to be set to 1.
+     * @param dropZeroEntries if true, zero entries resulting from the transformation are dropped from the matrix after the transformation.
+     * This action may impact the performance significantly.
      */
-    void makeRowDirac(index_type row, index_type column);
+    void makeRowDirac(index_type row, index_type column, bool dropZeroEntries = false);
 
     /*
      * Sums the entries in all rows.

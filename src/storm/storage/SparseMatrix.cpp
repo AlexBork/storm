@@ -885,7 +885,7 @@ void SparseMatrix<ValueType>::makeRowGroupsAbsorbing(storm::storage::BitVector c
 }
 
 template<typename ValueType>
-void SparseMatrix<ValueType>::makeRowDirac(index_type row, index_type column) {
+void SparseMatrix<ValueType>::makeRowDirac(index_type row, index_type column, bool dropZeroEntries) {
     iterator columnValuePtr = this->begin(row);
     iterator columnValuePtrEnd = this->end(row);
 
@@ -918,6 +918,9 @@ void SparseMatrix<ValueType>::makeRowDirac(index_type row, index_type column) {
             --this->nonzeroEntryCount;
         }
         columnValuePtr->setValue(storm::utility::zero<ValueType>());
+    }
+    if(dropZeroEntries){
+        this->dropZeroEntries();
     }
 }
 
