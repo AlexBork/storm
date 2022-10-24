@@ -863,9 +863,12 @@ storm::storage::BitVector SparseMatrix<ValueType>::getRowGroupFilter(storm::stor
 }
 
 template<typename ValueType>
-void SparseMatrix<ValueType>::makeRowsAbsorbing(storm::storage::BitVector const& rows) {
+void SparseMatrix<ValueType>::makeRowsAbsorbing(storm::storage::BitVector const& rows, bool dropZeroEntries) {
     for (auto row : rows) {
-        makeRowDirac(row, row);
+        makeRowDirac(row, row, false);
+    }
+    if(dropZeroEntries){
+        this->dropZeroEntries();
     }
 }
 

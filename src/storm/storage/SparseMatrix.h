@@ -659,8 +659,10 @@ class SparseMatrix {
      * This function makes the given rows absorbing.
      *
      * @param rows A bit vector indicating which rows are to be made absorbing.
+     * @param dropZeroEntries if true, zero entries resulting from the transformation are dropped from the matrix after the transformation.
+     * This action may impact the performance significantly.
      */
-    void makeRowsAbsorbing(storm::storage::BitVector const& rows);
+    void makeRowsAbsorbing(storm::storage::BitVector const& rows, bool dropZeroEntries = false);
 
     /*!
      * This function makes the groups of rows given by the bit vector absorbing.
