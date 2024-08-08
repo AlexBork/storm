@@ -1,6 +1,7 @@
 #include "RewardBoundUnfolder.h"
 
 #include <queue>
+#include "exceptions/UnsupportedModelException.h"
 #include "logic/RemoveBoundVisitor.h"
 #include "logic/UntilFormula.h"
 #include "storage/jani/Property.h"
@@ -18,10 +19,6 @@ typename RewardBoundUnfolder<ValueType>::UnfoldingResult RewardBoundUnfolder<Val
     STORM_LOG_THROW(formula.isProbabilityOperatorFormula() && formula.asOperatorFormula().getSubformula().isBoundedUntilFormula() &&
                         formula.asOperatorFormula().getSubformula().asBoundedUntilFormula().getLeftSubformula().isTrueFormula(),
                     storm::exceptions::NotSupportedException, "Unexpected formula type of formula " << formula);
-
-    // TODO check that reward models are state action rewards
-    // STORM_LOG_THROW(rewModel.hasStateActionRewards(), storm::exceptions::NotSupportedException, "Only state action rewards are currently supported.");
-
     std::vector<std::vector<uint64_t>> idToEpochMap;
     std::map<std::vector<uint64_t>, uint64_t> epochToIdMap;
     // Grab bounds
@@ -100,7 +97,14 @@ typename RewardBoundUnfolder<ValueType>::UnfoldingResult RewardBoundUnfolder<Val
                 ValueType reward = originalPomdp->getRewardModel(referencedRewardModelNames.at(i)).getStateActionReward(row);
                 STORM_LOG_ASSERT(reward == storm::utility::floor(reward),
                                  "Reward value in reward model " << referencedRewardModelNames.at(i) << "for action in row " << row << " is not an integer");
-                uint64_t rewardValueAsInt = storm::utility::convertNumber<uint64_t>(reward);
+                auto rewardValueAsInt = storm::utility::convertNumber<uint64_t>(reward);
+                if (originalPomdp->getRewardModel(referencedRewardModelNames.at(i)).hasStateRewards()) {
+                    auto stateVal = originalPomdp->getRewardModel(referencedRewardModelNames.at(i)).getStateReward(currentOriginalState);
+                    STORM_LOG_ASSERT(stateVal == storm::utility::floor(stateVal), "Reward value in reward model " << referencedRewardModelNames.at(i)
+                                                                                                                  << " for state " << currentOriginalState
+                                                                                                                  << " is not an integer");
+                    rewardValueAsInt += storm::utility::convertNumber<uint64_t>(stateVal);
+                }
                 if (rewardValueAsInt > idToEpochMap.at(currentEpoch).at(i)) {
                     // 0 for upper bounds means we can still keep going as long as we don't collect any more of the reward
                     // Entire action goes to sink with prob 1
@@ -123,6 +127,13 @@ typename RewardBoundUnfolder<ValueType>::UnfoldingResult RewardBoundUnfolder<Val
                 STORM_LOG_ASSERT(reward == storm::utility::floor(reward),
                                  "Reward value in reward model " << referencedRewardModelNames.at(i) << "for action in row " << row << " is not an integer");
                 auto rewardValueAsInt = storm::utility::convertNumber<uint64_t>(reward);
+                if (originalPomdp->getRewardModel(referencedRewardModelNames.at(i)).hasStateRewards()) {
+                    auto stateVal = originalPomdp->getRewardModel(referencedRewardModelNames.at(i)).getStateReward(currentOriginalState);
+                    STORM_LOG_ASSERT(stateVal == storm::utility::floor(stateVal), "Reward value in reward model " << referencedRewardModelNames.at(i)
+                                                                                                                  << " for state " << currentOriginalState
+                                                                                                                  << " is not an integer");
+                    rewardValueAsInt += storm::utility::convertNumber<uint64_t>(stateVal);
+                }
                 if (rewardValueAsInt >= idToEpochMap.at(currentEpoch).at(i)) {
                     // 0 for lower bounds means we have satisfied the bound
                     epochValues[i] = 0ul;
@@ -266,9 +277,6 @@ typename RewardBoundUnfolder<ValueType>::RewardAwareUnfoldingResult RewardBoundU
                         formula.asOperatorFormula().getSubformula().asBoundedUntilFormula().getLeftSubformula().isTrueFormula(),
                     storm::exceptions::NotSupportedException, "Unexpected formula type of formula " << formula);
 
-    // TODO check that reward models are state action rewards
-    // STORM_LOG_THROW(rewModel.hasStateActionRewards(), storm::exceptions::NotSupportedException, "Only state action rewards are currently supported.");
-
     std::vector<std::vector<uint64_t>> idToEpochMap;
     std::map<std::vector<uint64_t>, uint64_t> epochToIdMap;
     // Grab bounds
@@ -371,7 +379,6 @@ typename RewardBoundUnfolder<ValueType>::RewardAwareUnfoldingResult RewardBoundU
     while (!processingQ.empty()) {
         uint64_t currentOriginalState, currentRewVec, currentEpoch;
         std::tie(currentOriginalState, currentRewVec, currentEpoch) = processingQ.front();
-        STORM_PRINT("Explore state " << currentOriginalState << " with reward vector " << currentRewVec << " and epoch " << currentEpoch << "\n");
         processingQ.pop();
         uint64_t rowGroupStart = ogMatrix.getRowGroupIndices().at(currentOriginalState);
         uint64_t rowGroupSize = ogMatrix.getRowGroupSize(currentOriginalState);
