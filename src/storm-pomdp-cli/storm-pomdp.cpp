@@ -425,10 +425,18 @@ void processOptionsWithValueTypeAndDdLib(storm::cli::SymbolicInput const& symbol
                 STORM_PRINT_AND_LOG("Perform explicit unfolding of reward bounds.\n");
                 storm::utility::Stopwatch unfoldingWatch(true);
                 transformer::RewardBoundUnfolder<ValueType> rewardBoundUnfolder;
-                typename transformer::RewardBoundUnfolder<ValueType>::UnfoldingResult unfoldingResult =
-                    rewardBoundUnfolder.unfold(pomdp, *formula, pomdpSettings.isRewardObservableSet());
-                pomdp = unfoldingResult.pomdp;
-                formula = unfoldingResult.formula;
+                if (!pomdpSettings.isRewardObservableSet()) {
+                    typename transformer::RewardBoundUnfolder<ValueType>::UnfoldingResult unfoldingResult = rewardBoundUnfolder.unfold(pomdp, *formula);
+                    pomdp = unfoldingResult.pomdp;
+                    formula = unfoldingResult.formula;
+                } else {
+                    STORM_PRINT_AND_LOG("Use reward-aware unfolding.\n");
+                    typename transformer::RewardBoundUnfolder<ValueType>::RewardAwareUnfoldingResult unfoldingResult =
+                        rewardBoundUnfolder.unfoldRewardAware(pomdp, *formula);
+                    pomdp = unfoldingResult.pomdp;
+                    formula = unfoldingResult.formula;
+                }
+
                 STORM_PRINT_AND_LOG("Unfolding POMDP Information:\n");
                 pomdp->printModelInformationToStream(std::cout);
                 STORM_PRINT_AND_LOG("Transformed formula: " << *formula << "\n");
