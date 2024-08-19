@@ -192,8 +192,12 @@ std::vector<uint64_t> MakePOMDPCanonic<ValueType>::computeCanonicalPermutation()
                         actionval = *pomdp.getChoiceLabeling().getLabelsOfChoice(rowIndexFrom).begin();
                     }
                 }
+                std::string obsval = "";
+                if (pomdp.hasObservationValuations()) {
+                    obsval = " (" + pomdp.getObservationValuations().getStateInfo(observation) + ") ";
+                }
                 STORM_LOG_THROW(false, storm::exceptions::AmbiguousModelException,
-                                "Observation " << observation << " sometimes provides multiple actions, but in state " << state << stateval
+                                "Observation " << observation << obsval << " sometimes provides multiple actions, but in state " << state << stateval
                                                << " provides only one action " << actionval << ".");
             }
             oneActionObservations.set(observation);
@@ -207,13 +211,18 @@ std::vector<uint64_t> MakePOMDPCanonic<ValueType>::computeCanonicalPermutation()
                 if (pomdp.hasStateValuations()) {
                     stateval = " (" + pomdp.getStateValuations().getStateInfo(state) + ") ";
                 }
-                //                        std::string actionval= "";
-                //                        if (pomdp.hasChoiceLabeling()) {
-                //                            actionval = *pomdp.getChoiceLabeling().getLabelsOfChoice(rowIndexFrom).begin();
-                //                        }
+                std::string actionval = "";
+                if (pomdp.hasChoiceLabeling()) {
+                    for (uint64_t i = rowIndexFrom; i < rowIndexTo; ++i) {
+                        actionval += *pomdp.getChoiceLabeling().getLabelsOfChoice(rowIndexFrom).begin();
+                        if (i != rowIndexTo - 1) {
+                            actionval += " & ";
+                        }
+                    }
+                }
                 STORM_LOG_THROW(false, storm::exceptions::AmbiguousModelException,
                                 "Observation " << observation << " sometimes provides one action, but in state " << state << stateval << " provides "
-                                               << rowIndexTo - rowIndexFrom << " actions.");
+                                               << rowIndexTo - rowIndexFrom << " actions. (" << actionval << ")");
             }
             moreActionObservations.set(observation);
         }
