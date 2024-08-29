@@ -8,7 +8,7 @@
 #include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
 
-#include "BeliefBasedModelCheckerOptions.h"
+#include "storm-pomdp/beliefs/verification/BeliefBasedModelCheckerOptions.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/api/verification.h"
 #include "storm/modelchecker/results/ExplicitQuantitativeCheckResult.h"
