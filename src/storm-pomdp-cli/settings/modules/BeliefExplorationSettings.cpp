@@ -25,9 +25,10 @@ const std::string observationThresholdOption = "obs-threshold";
 const std::string numericPrecisionOption = "numeric-precision";
 const std::string triangulationModeOption = "triangulationmode";
 const std::string clippingOption = "use-clipping";
-const std::string revisedImplementationOption = "revised";
 const std::string cutZeroGapOption = "cut-zero-gap";
 const std::string stateEliminationCutoffOption = "state-elimination-cutoff";
+const std::string beliefMdpNumberTypeOption = "belief-mdp-number-type";
+std::vector<std::string> beliefMdpNumberTypes = {"double", "rational"};
 
 BeliefExplorationSettings::BeliefExplorationSettings() : ModuleSettings(moduleName) {
     this->addOption(
@@ -155,13 +156,18 @@ BeliefExplorationSettings::BeliefExplorationSettings() : ModuleSettings(moduleNa
     this->addOption(
         storm::settings::OptionBuilder(moduleName, clippingOption, false, "If this is set, unfolding will use  (grid) clipping instead of cut-offs only.")
             .build());
-    this->addOption(storm::settings::OptionBuilder(moduleName, revisedImplementationOption, false,
-                                                   "If set, the revised implementation is used (which does not yet support all features).")
-                        .build());
+
     this->addOption(
         storm::settings::OptionBuilder(moduleName, cutZeroGapOption, false, "Cut beliefs where the gap between over- and underapproximation is 0.").build());
     this->addOption(storm::settings::OptionBuilder(moduleName, stateEliminationCutoffOption, false,
                                                    "If this is set, an additional unfolding step for cut-off beliefs is performed.")
+                        .build());
+
+    this->addOption(storm::settings::OptionBuilder(moduleName, beliefMdpNumberTypeOption, false, "Sets the number type to use for generated belief MDPs")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument("type", "Type to use.")
+                                         .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(beliefMdpNumberTypes))
+                                         .setDefaultValueString("double")
+                                         .build())
                         .build());
 }
 
@@ -245,6 +251,14 @@ bool BeliefExplorationSettings::isStaticTriangulationModeSet() const {
     return this->getOption(triangulationModeOption).getArgumentByName("value").getValueAsString() == "static";
 }
 
+bool BeliefExplorationSettings::isBeliefMDPNumberTypeDouble() const {
+    return this->getOption(beliefMdpNumberTypeOption).getArgumentByName("type").getValueAsString() == "double";
+}
+
+bool BeliefExplorationSettings::isBeliefMDPNumberTypeRational() const {
+    return this->getOption(triangulationModeOption).getArgumentByName("value").getValueAsString() == "rational";
+}
+
 bool BeliefExplorationSettings::isUseClippingSet() const {
     return this->getOption(clippingOption).getHasOptionBeenSet();
 }
@@ -255,7 +269,6 @@ bool BeliefExplorationSettings::isCutZeroGapSet() const {
 
 template<typename ValueType>
 void BeliefExplorationSettings::setValuesInOptionsStruct(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>& options) const {
-    options.useRevisedImplementation = this->getOption(revisedImplementationOption).getHasOptionBeenSet();  // TODO
     options.refine = isRefineSet();
     options.refinePrecision = storm::utility::convertNumber<ValueType>(getRefinePrecision());
     options.refineStepLimit = getRefineStepLimit();

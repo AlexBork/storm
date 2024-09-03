@@ -15,6 +15,8 @@ namespace modules {
 const std::string POMDPSettings::moduleName = "pomdp";
 const std::string noCanonicOption = "nocanonic";
 const std::string exportAsParametricModelOption = "parametric-drn";
+const std::string beliefExplorationOption = "belief-exploration";
+std::vector<std::string> beliefExplorationModes = {"both", "discretize", "unfold"};
 const std::string beliefExplorationLegacyOption = "legacy-belief-exploration";
 std::vector<std::string> legacyBeliefExplorationModes = {"both", "discretize", "unfold"};
 const std::string qualitativeReductionOption = "qualitativereduction";
@@ -62,6 +64,14 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
                              .makeOptional()
                              .build())
             .build());
+    this->addOption(storm::settings::OptionBuilder(moduleName, beliefExplorationOption, false, "Analyze the POMDP by exploring the belief space.")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument(
+                                         "mode", "Sets whether lower bounds, upper bounds, or interval bounds are computed.")
+                                         .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(beliefExplorationModes))
+                                         .setDefaultValueString("both")
+                                         .makeOptional()
+                                         .build())
+                        .build());
     this->addOption(
         storm::settings::OptionBuilder(moduleName, checkFullyObservableOption, false, "Performs standard model checking on the underlying MDP").build());
     this->addOption(storm::settings::OptionBuilder(moduleName, isQualitativeOption, false, "Sets the option qualitative analysis").build());
@@ -89,6 +99,20 @@ bool POMDPSettings::isAnalyzeUniqueObservationsSet() const {
 
 bool POMDPSettings::isSelfloopReductionSet() const {
     return this->getOption(selfloopReductionOption).getHasOptionBeenSet();
+}
+
+bool POMDPSettings::isBeliefExplorationSet() const {
+    return this->getOption(beliefExplorationOption).getHasOptionBeenSet();
+}
+
+bool POMDPSettings::isBeliefExplorationDiscretizeSet() const {
+    std::string arg = this->getOption(beliefExplorationOption).getArgumentByName("mode").getValueAsString();
+    return isBeliefExplorationSet() && (arg == "discretize" || arg == "both");
+}
+
+bool POMDPSettings::isBeliefExplorationUnfoldSet() const {
+    std::string arg = this->getOption(beliefExplorationOption).getArgumentByName("mode").getValueAsString();
+    return isBeliefExplorationSet() && (arg == "unfold" || arg == "both");
 }
 
 bool POMDPSettings::isLegacyBeliefExplorationSet() const {
