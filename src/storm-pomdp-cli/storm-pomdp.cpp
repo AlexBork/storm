@@ -251,10 +251,10 @@ bool performAnalysis(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> co
                      storm::logic::Formula const& formula) {
     auto const& pomdpSettings = storm::settings::getModule<storm::settings::modules::POMDPSettings>();
     bool analysisPerformed = false;
-    if (pomdpSettings.isBeliefExplorationSet()) {
+    if (pomdpSettings.isLegacyBeliefExplorationSet()) {
         STORM_PRINT_AND_LOG("Exploring the belief MDP... \n");
-        auto options = storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>(pomdpSettings.isBeliefExplorationDiscretizeSet(),
-                                                                                                        pomdpSettings.isBeliefExplorationUnfoldSet());
+        auto options = storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>(pomdpSettings.isLegacyBeliefExplorationDiscretizeSet(),
+                                                                                                        pomdpSettings.isLegacyBeliefExplorationUnfoldSet());
         auto const& beliefExplorationSettings = storm::settings::getModule<storm::settings::modules::BeliefExplorationSettings>();
         beliefExplorationSettings.setValuesInOptionsStruct(options);
         storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>, BeliefType> checker(pomdp, options);

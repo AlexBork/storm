@@ -15,8 +15,8 @@ namespace modules {
 const std::string POMDPSettings::moduleName = "pomdp";
 const std::string noCanonicOption = "nocanonic";
 const std::string exportAsParametricModelOption = "parametric-drn";
-const std::string beliefExplorationOption = "belief-exploration";
-std::vector<std::string> beliefExplorationModes = {"both", "discretize", "unfold"};
+const std::string beliefExplorationLegacyOption = "legacy-belief-exploration";
+std::vector<std::string> legacyBeliefExplorationModes = {"both", "discretize", "unfold"};
 const std::string qualitativeReductionOption = "qualitativereduction";
 const std::string analyzeUniqueObservationsOption = "uniqueobservations";
 const std::string selfloopReductionOption = "selfloopreduction";
@@ -54,9 +54,10 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
                                          .build())
                         .build());
     this->addOption(
-        storm::settings::OptionBuilder(moduleName, beliefExplorationOption, false, "Analyze the POMDP by exploring the belief state-space.")
+        storm::settings::OptionBuilder(moduleName, beliefExplorationLegacyOption, false,
+                                       "Analyze the POMDP by exploring the belief space using the legacy implementation.")
             .addArgument(storm::settings::ArgumentBuilder::createStringArgument("mode", "Sets whether lower, upper, or interval result bounds are computed.")
-                             .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(beliefExplorationModes))
+                             .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(legacyBeliefExplorationModes))
                              .setDefaultValueString("both")
                              .makeOptional()
                              .build())
@@ -90,18 +91,18 @@ bool POMDPSettings::isSelfloopReductionSet() const {
     return this->getOption(selfloopReductionOption).getHasOptionBeenSet();
 }
 
-bool POMDPSettings::isBeliefExplorationSet() const {
-    return this->getOption(beliefExplorationOption).getHasOptionBeenSet();
+bool POMDPSettings::isLegacyBeliefExplorationSet() const {
+    return this->getOption(beliefExplorationLegacyOption).getHasOptionBeenSet();
 }
 
-bool POMDPSettings::isBeliefExplorationDiscretizeSet() const {
-    std::string arg = this->getOption(beliefExplorationOption).getArgumentByName("mode").getValueAsString();
-    return isBeliefExplorationSet() && (arg == "discretize" || arg == "both");
+bool POMDPSettings::isLegacyBeliefExplorationDiscretizeSet() const {
+    std::string arg = this->getOption(beliefExplorationLegacyOption).getArgumentByName("mode").getValueAsString();
+    return isLegacyBeliefExplorationSet() && (arg == "discretize" || arg == "both");
 }
 
-bool POMDPSettings::isBeliefExplorationUnfoldSet() const {
-    std::string arg = this->getOption(beliefExplorationOption).getArgumentByName("mode").getValueAsString();
-    return isBeliefExplorationSet() && (arg == "unfold" || arg == "both");
+bool POMDPSettings::isLegacyBeliefExplorationUnfoldSet() const {
+    std::string arg = this->getOption(beliefExplorationLegacyOption).getArgumentByName("mode").getValueAsString();
+    return isLegacyBeliefExplorationSet() && (arg == "unfold" || arg == "both");
 }
 
 bool POMDPSettings::isCheckFullyObservableSet() const {
