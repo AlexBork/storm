@@ -197,7 +197,7 @@ class BeliefExplorationPomdpModelChecker {
      */
     std::shared_ptr<ExplorerType> getInteractiveBeliefExplorer();
 
-    void setFMSchedValueList(std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> valueList);
+    void setFMSchedValueList(std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> valueList, uint64_t index);
 
     /**
      * Get the current status of the interactive unfolding

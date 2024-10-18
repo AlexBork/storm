@@ -1594,8 +1594,8 @@ BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefMDPTyp
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMDPType>
 void BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefMDPType>::setFMSchedValueList(
-    std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> valueList) {
-    interactiveUnderApproximationExplorer->setFMSchedValueList(valueList);
+    std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> valueList, uint64_t index) {
+    interactiveUnderApproximationExplorer->setFMSchedValueList(valueList, index);
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMDPType>
