@@ -1,5 +1,4 @@
-#ifndef STORM_MODEL_CHECKER_DISCOUNTINGHELPER_H
-#define STORM_MODEL_CHECKER_DISCOUNTINGHELPER_H
+#pragma once
 
 #include "SingleValueModelCheckerHelper.h"
 #include "storm/solver/helper/ValueIterationOperator.h"
@@ -66,4 +65,3 @@ class DiscountingHelper : public SingleValueModelCheckerHelper<ValueType, storm:
 }  // namespace helper
 }  // namespace modelchecker
 }  // namespace storm
-#endif  // STORM_MODEL_CHECKER_DISCOUNTINGHELPER_H

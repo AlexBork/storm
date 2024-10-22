@@ -105,7 +105,12 @@ boost::any ExpressionSubstitutionVisitor::visit(DiscountedCumulativeRewardFormul
         bounds.emplace_back(TimeBound(f.isBoundStrict(i), substitutionFunction(f.getBound(i))));
         timeBoundReferences.push_back(f.getTimeBoundReference(i));
     }
-    return std::static_pointer_cast<Formula>(std::make_shared<DiscountedCumulativeRewardFormula>(f.getDiscountFactor(), bounds, timeBoundReferences));
+    boost::optional<RewardAccumulation> optionalRewardAccumulation;
+    if (f.hasRewardAccumulation()) {
+        optionalRewardAccumulation = f.getRewardAccumulation();
+    }
+    return std::static_pointer_cast<Formula>(
+        std::make_shared<DiscountedCumulativeRewardFormula>(f.getDiscountFactor(), bounds, timeBoundReferences, optionalRewardAccumulation));
 }
 
 boost::any ExpressionSubstitutionVisitor::visit(InstantaneousRewardFormula const& f, boost::any const& data) const {

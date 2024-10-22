@@ -176,12 +176,12 @@ void FormulaParserGrammar::initialize() {
 
     // Quantitative path formulae (reward)
     discountedCumulativeRewardFormula =
-        (qi::lit("C") >> (qi::lit("{") > expressionParser > qi::lit("}")) >>
+        (qi::lit("Cdiscount=") >> expressionParser >>
          timeBounds)[qi::_val = phoenix::bind(&FormulaParserGrammar::createDiscountedCumulativeRewardFormula, phoenix::ref(*this), qi::_1, qi::_2)];
     discountedCumulativeRewardFormula.name("discounted cumulative reward formula");
     discountedTotalRewardFormula =
-        (qi::lit("C") >> (qi::lit("{") > expressionParser >
-                          qi::lit("}")))[qi::_val = phoenix::bind(&FormulaParserGrammar::createDiscountedTotalRewardFormula, phoenix::ref(*this), qi::_1)];
+        (qi::lit("Cdiscount=") >>
+         expressionParser)[qi::_val = phoenix::bind(&FormulaParserGrammar::createDiscountedTotalRewardFormula, phoenix::ref(*this), qi::_1)];
     discountedTotalRewardFormula.name("discounted total reward formula");
     longRunAverageRewardFormula = (qi::lit("LRA") | qi::lit("S") |
                                    qi::lit("MP"))[qi::_val = phoenix::bind(&FormulaParserGrammar::createLongRunAverageRewardFormula, phoenix::ref(*this))];
@@ -287,8 +287,8 @@ void FormulaParserGrammar::initialize() {
     //            debug(filterProperty)
     //            debug(constantDefinition )
     //            debug(start)
-    //            debug(discountedCumulativeRewardFormula);
-    //            debug(discountedTotalRewardFormula);
+    //            debug(discountedCumulativeRewardFormula)
+    //            debug(discountedTotalRewardFormula)
 
     // Enable error reporting.
     qi::on_error<qi::fail>(rewardModelName, handler(qi::_1, qi::_2, qi::_3, qi::_4));
@@ -436,8 +436,7 @@ std::shared_ptr<storm::logic::Formula const> FormulaParserGrammar::createTotalRe
 
 std::shared_ptr<storm::logic::Formula const> FormulaParserGrammar::createDiscountedTotalRewardFormula(
     storm::expressions::Expression const& discountFactor) const {
-    return std::shared_ptr<storm::logic::Formula const>(
-        new storm::logic::DiscountedTotalRewardFormula(std::make_shared<storm::expressions::Expression>(discountFactor)));
+    return std::shared_ptr<storm::logic::Formula const>(new storm::logic::DiscountedTotalRewardFormula(discountFactor));
 }
 
 std::shared_ptr<storm::logic::Formula const> FormulaParserGrammar::createLongRunAverageRewardFormula() const {

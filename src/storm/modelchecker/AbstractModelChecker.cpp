@@ -165,8 +165,7 @@ std::unique_ptr<CheckResult> AbstractModelChecker<ModelType>::computeRewards(Env
     storm::logic::Formula const& rewardFormula = checkTask.getFormula();
     if (rewardFormula.isCumulativeRewardFormula()) {
         if (rewardFormula.isDiscountedCumulativeRewardFormula()) {
-            return this->computeDiscountedCumulativeRewards(env,
-                                                            checkTask.substituteFormula(rewardFormula.asDiscountedCumulativeRewardFormula()));
+            return this->computeDiscountedCumulativeRewards(env, checkTask.substituteFormula(rewardFormula.asDiscountedCumulativeRewardFormula()));
         } else {
             return this->computeCumulativeRewards(env, checkTask.substituteFormula(rewardFormula.asCumulativeRewardFormula()));
         }
