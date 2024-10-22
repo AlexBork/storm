@@ -15,20 +15,33 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
 
 // TODO: overloads for extra transition data (e.g. reward vectors)
 
+/**
+ * Builds a belief MDP from the given exploration information and property information.
+ * Variant with implicit cut-offs, i.e. in frontier beliefs we consider all actions, add transitions to already explored beliefs and cut off the rest.
+ * @tparam BeliefMdpValueType ValueType of the belief MDP
+ * @tparam BeliefType Type of the belief
+ * @tparam ExtraTransitionData Types of additional data to store for transitions (e.g. reward vectors)
+ * @param explorationInformation object containing information about the exploration of the belief space (explored beliefs, transitions, etc.)
+ * @param propertyInformation object containing information about the property to verify
+ * @param computeCutOffValue function to compute the best cut-off value for a belief given the provided information.
+ * @return the belief MDP
+ */
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
 std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
     PropertyInformation const& propertyInformation, std::function<BeliefMdpValueType(BeliefType const&)> computeCutOffValue);
 
 /**
- * Variant for explicit cut-offs in frontier beliefs
- * TODO: document
- * @tparam BeliefMdpValueType
- * @tparam BeliefType
- * @param explorationInformation
- * @param propertyInformation
- * @param computeCutOffValueMap
- * @return
+ * Builds a belief MDP from the given exploration information and property information.
+ * Variant with implicit cut-offs, i.e. in frontier beliefs we consider all actions, add transitions to already explored beliefs and cut off the rest.
+ * @tparam BeliefMdpValueType ValueType of the belief MDP
+ * @tparam BeliefType Type of the belief
+ * @tparam ExtraTransitionData Types of additional data to store for transitions (e.g. reward vectors)
+ * @param explorationInformation object containing information about the exploration of the belief space (explored beliefs, transitions, etc.)
+ * @param propertyInformation object containing information about the property to verify
+ * @param computeCutOffValueMap function to compute all cut-off values for a belief given the provided information. A separate cut-off action is added for each
+ * value, allowing the model checker to choose the best one. This choice can later be retraced.
+ * @return the belief MDP
  */
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
 std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
