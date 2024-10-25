@@ -79,6 +79,8 @@ class FirstStateNextStateGenerator {
 
     typename PomdpType::ValueType getBeliefActionReward(BeliefType const& belief, uint64_t const& localActionIndex) const;
 
+    std::set<std::string> getBeliefActionChoiceLabels(BeliefType const& belief, uint64_t const& localActionIndex) const;
+
     template<typename DiscoverCallbackType>
     auto getHandle(DiscoverCallbackType& discoverCallback) {
         return Handle<NoAbstractionType const, NoAbstractionType const, DiscoverCallbackType>{this->pomdp, NoAbstraction, NoAbstraction, discoverCallback};

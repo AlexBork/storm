@@ -57,6 +57,11 @@ bool BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::performExplor
                 info.actionRewards.emplace_back(
                     storm::utility::convertNumber<BeliefMdpValueType>(firstStateNextStateGenerator.getBeliefActionReward(currentBelief, localActionIndex)));
             }
+            if (info.optionalActionLabelingInfo.has_value()) {
+                for (auto const& label : firstStateNextStateGenerator.getBeliefActionChoiceLabels(currentBelief, localActionIndex)) {
+                    info.optionalActionLabelingInfo.value().addChoiceLabel(currentBeliefId, localActionIndex, label);
+                }
+            }
         }
         info.matrix.endCurrentRowGroup();
     }

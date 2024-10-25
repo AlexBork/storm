@@ -190,6 +190,10 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
 
     auto info = exploration.template initializeExploration<InfoType>(pomdp.getNrObservations());
 
+    if (options.buildChoiceLabeling) {
+        info.optionalActionLabelingInfo = ActionLabelingInformation();
+    }
+
     // Determine terminationCallback based on options
     typename BeliefExplorationType::TerminationCallback terminationCallback =
         getTerminationCallback<PomdpModelType, BeliefType, BeliefMdpValueType>(options, info, swExplore);

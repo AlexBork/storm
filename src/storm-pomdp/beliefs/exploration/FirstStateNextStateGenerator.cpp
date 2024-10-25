@@ -67,6 +67,14 @@ typename PomdpType::ValueType FirstStateNextStateGenerator<PomdpType, BeliefType
     return result;
 }
 
+template<typename PomdpType, typename BeliefType>
+std::set<std::string> FirstStateNextStateGenerator<PomdpType, BeliefType>::getBeliefActionChoiceLabels(BeliefType const& belief,
+                                                                                                       uint64_t const& localActionIndex) const {
+    STORM_LOG_ASSERT(pomdp.hasChoiceLabeling(), "Requested a choice label although no choice labeling was specified in the POMDP.");
+    STORM_LOG_ASSERT(localActionIndex < getBeliefNumberOfActions(belief), "Invalid action index " << localActionIndex << ".");
+    return pomdp.getChoiceLabeling().getLabelsOfChoice(pomdp.getTransitionMatrix().getRowGroupIndices().at(belief.representativeState()) + localActionIndex);
+}
+
 template class FirstStateNextStateGenerator<storm::models::sparse::Pomdp<double>, Belief<double>>;
 template class FirstStateNextStateGenerator<storm::models::sparse::Pomdp<storm::RationalNumber>, Belief<double>>;
 template class FirstStateNextStateGenerator<storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>;
