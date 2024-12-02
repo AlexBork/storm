@@ -56,12 +56,15 @@ class BeliefExplorationMatrix {
      */
     std::size_t groups() const;
 
+    bool hasChoiceLabels() const;
+
     /*!
      * Stores the successor
      */
     std::vector<BeliefExplorationTransition<ValueType, ExtraTransitionData...>> transitions;
     std::vector<uint64_t> rowIndications;
     std::vector<uint64_t> rowGroupIndices;
+    std::vector<std::set<std::string>> choiceLabels;
 };
 
 }  // namespace storm::pomdp::beliefs

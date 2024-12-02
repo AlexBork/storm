@@ -5,18 +5,6 @@
 #include "storm-pomdp/beliefs/utility/types.h"
 
 namespace storm::pomdp::beliefs {
-struct ActionLabelingInformation {
-    std::unordered_map<BeliefId, std::unordered_map<uint64_t, std::set<std::string>>> beliefActionToChoiceLabels;
-
-    void addChoiceLabel(BeliefId const& beliefId, uint64_t const& localActionIndex, std::string const& label) {
-        beliefActionToChoiceLabels[beliefId][localActionIndex].insert(label);
-    }
-
-    [[nodiscard]] std::set<std::string> getChoiceLabels(BeliefId const& beliefId, uint64_t const& localActionIndex) {
-        return beliefActionToChoiceLabels[beliefId][localActionIndex];
-    }
-};
-
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
 struct ExplorationInformation {
     BeliefExplorationMatrix<BeliefMdpValueType, ExtraTransitionData...> matrix;
@@ -27,7 +15,7 @@ struct ExplorationInformation {
     BeliefId initialBeliefId;
     ExplorationQueue queue;
     uint64_t nrObservationsInPomdp;
-    std::optional<ActionLabelingInformation> optionalActionLabelingInfo;
+    bool generateChoiceLabeling = false;
 
     [[nodiscard]] std::unordered_set<BeliefId> getFrontierBeliefs() const {
         std::unordered_set<BeliefId> resFrontierBeliefs;

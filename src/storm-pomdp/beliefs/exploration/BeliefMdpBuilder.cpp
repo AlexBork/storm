@@ -80,6 +80,7 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWi
     uint64_t const numChoices = explorationInformation.matrix.rows() + numExtraStates;
     uint64_t const targetState = numStates - numExtraStates;
     uint64_t const bottomState = numStates - 1;
+    std::optional<models::sparse::ChoiceLabeling> optionalChoiceLabeling;
     std::vector<BeliefMdpValueType> actionRewards;
     if (!reachabilityProbability) {
         actionRewards.reserve(numChoices);
@@ -88,6 +89,9 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWi
         STORM_LOG_ASSERT(numChoices == actionRewards.size(),
                          "Unexpected size of action rewards: Expected " << numChoices << " got " << actionRewards.size() << ".");
     }
+    if (explorationInformation.matrix.hasChoiceLabels()) {
+        optionalChoiceLabeling = models::sparse::ChoiceLabeling(numChoices);
+    }
     storm::storage::SparseMatrixBuilder<BeliefMdpValueType> transitionBuilder(numChoices, numStates, 0, true, true, numStates);
     for (uint64_t state = 0; state < numStates - numExtraStates; ++state) {
         uint64_t choice = explorationInformation.matrix.rowGroupIndices[state];
@@ -95,6 +99,14 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWi
         for (uint64_t const groupEnd = explorationInformation.matrix.rowGroupIndices[state + 1]; choice < groupEnd; ++choice) {
             auto probabilityToBottom = storm::utility::zero<BeliefMdpValueType>();
             auto probabilityToTarget = storm::utility::zero<BeliefMdpValueType>();
+            if (optionalChoiceLabeling.has_value()) {
+                for (auto const& label : explorationInformation.matrix.choiceLabels.at(choice)) {
+                    if (!optionalChoiceLabeling.value().containsLabel(label)) {
+                        optionalChoiceLabeling.value().addLabel(label);
+                    }
+                    optionalChoiceLabeling.value().addLabelToChoice(label, choice);
+                }
+            }
             for (uint64_t entryIndex = explorationInformation.matrix.rowIndications[choice];
                  entryIndex < explorationInformation.matrix.rowIndications[choice + 1]; ++entryIndex) {
                 auto const& entry = explorationInformation.matrix.transitions[entryIndex];
@@ -132,9 +144,21 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWi
     if (reachabilityProbability) {
         transitionBuilder.newRowGroup(numChoices - 2);
         transitionBuilder.addNextValue(numChoices - 2, targetState, storm::utility::one<BeliefMdpValueType>());
+        if (optionalChoiceLabeling.has_value()) {
+            if (!optionalChoiceLabeling.value().containsLabel("__loop__")) {
+                optionalChoiceLabeling.value().addLabel("__loop__");
+            }
+            optionalChoiceLabeling.value().addLabelToChoice("__loop__", numChoices - 2);
+        }
     }
     transitionBuilder.newRowGroup(numChoices - 1);
     transitionBuilder.addNextValue(numChoices - 1, bottomState, storm::utility::one<BeliefMdpValueType>());
+    if (optionalChoiceLabeling.has_value()) {
+        if (!optionalChoiceLabeling.value().containsLabel("__loop__")) {
+            optionalChoiceLabeling.value().addLabel("__loop__");
+        }
+        optionalChoiceLabeling.value().addLabelToChoice("__loop__", numChoices - 1);
+    }
 
     storm::models::sparse::StateLabeling stateLabeling(numStates);
     stateLabeling.addLabel("bottom");
@@ -147,6 +171,10 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWi
         stateLabeling.addLabelToState("target", targetState);
     }
     storm::storage::sparse::ModelComponents<BeliefMdpValueType> components(transitionBuilder.build(), std::move(stateLabeling));
+
+    if (optionalChoiceLabeling.has_value()) {
+        components.choiceLabeling = std::move(optionalChoiceLabeling.value());
+    }
 
     if (!reachabilityProbability) {
         storm::models::sparse::StandardRewardModel<BeliefMdpValueType> rewardModel(std::nullopt, std::move(actionRewards));
@@ -186,6 +214,10 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
     uint64_t const numChoices = explorationInformation.matrix.rows() + numBottomTargetStates + nrCutOffChoices;
     uint64_t const targetState = numStates - (reachabilityProbability ? 2ull : 1ull);
     uint64_t const bottomState = numStates - 1;
+    std::optional<models::sparse::ChoiceLabeling> optionalChoiceLabeling;
+    if (explorationInformation.matrix.hasChoiceLabels()) {
+        optionalChoiceLabeling = models::sparse::ChoiceLabeling(numChoices);
+    }
 
     std::vector<BeliefMdpValueType> actionRewards;
     if (!reachabilityProbability) {
@@ -266,6 +298,14 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
             if (!storm::utility::isZero(probabilityToBottom)) {
                 transitionBuilder.addNextValue(choice, bottomState, probabilityToBottom);
             }
+            if (optionalChoiceLabeling.has_value()) {
+                for (auto const& label : explorationInformation.matrix.choiceLabels.at(choice)) {
+                    if (!optionalChoiceLabeling.value().containsLabel(label)) {
+                        optionalChoiceLabeling.value().addLabel(label);
+                    }
+                    optionalChoiceLabeling.value().addLabelToChoice(label, choice);
+                }
+            }
         }
     }
     // Treat frontier beliefs
@@ -284,7 +324,12 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
                 transitionBuilder.addNextValue(choice, bottomState, storm::utility::one<BeliefMdpValueType>());
                 actionRewards[choice] += entry.second;
             }
-            // TODO add labeling information
+            if (optionalChoiceLabeling.has_value()) {
+                if (!optionalChoiceLabeling.value().containsLabel(entry.first)) {
+                    optionalChoiceLabeling.value().addLabel(entry.first);
+                }
+                optionalChoiceLabeling.value().addLabelToChoice(entry.first, choice);
+            }
             ++choice;
         }
     }
@@ -295,12 +340,24 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
         for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
             transitionRewardBuilder.newRowGroup(numChoices - 2);
         }
+        if (optionalChoiceLabeling.has_value()) {
+            if (!optionalChoiceLabeling.value().containsLabel("__loop__")) {
+                optionalChoiceLabeling.value().addLabel("__loop__");
+            }
+            optionalChoiceLabeling.value().addLabelToChoice("__loop__", numChoices - 2);
+        }
         transitionBuilder.addNextValue(numChoices - 2, targetState, storm::utility::one<BeliefMdpValueType>());
     }
     transitionBuilder.newRowGroup(numChoices - 1);
     transitionBuilder.addNextValue(numChoices - 1, bottomState, storm::utility::one<BeliefMdpValueType>());
     for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
         transitionRewardBuilder.newRowGroup(numChoices - 1);
+    }
+    if (optionalChoiceLabeling.has_value()) {
+        if (!optionalChoiceLabeling.value().containsLabel("__loop__")) {
+            optionalChoiceLabeling.value().addLabel("__loop__");
+        }
+        optionalChoiceLabeling.value().addLabelToChoice("__loop__", numChoices - 1);
     }
 
     storm::models::sparse::StateLabeling stateLabeling(numStates);
@@ -333,6 +390,9 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
     if (!reachabilityProbability) {
         storm::models::sparse::StandardRewardModel<BeliefMdpValueType> rewardModel(std::nullopt, std::move(actionRewards));
         components.rewardModels.emplace(propertyInformation.rewardModelName.value(), std::move(rewardModel));
+    }
+    if(optionalChoiceLabeling.has_value()) {
+        components.choiceLabeling = optionalChoiceLabeling.value();
     }
 
     if (propertyInformation.kind == PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
