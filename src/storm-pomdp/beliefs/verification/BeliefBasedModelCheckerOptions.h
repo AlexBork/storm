@@ -6,7 +6,8 @@ enum explorationTerminationCriterion { MAX_EXPLORATION_SIZE, MAX_EXPLORATION_TIM
 template<typename ValueType>
 struct BeliefBasedModelCheckerOptions {
     bool implicitCutOffs = false;
-    bool buildChoiceLabeling = false;
+    bool buildChoiceLabeling = true;
+    bool generatePolicy = true;
 
     // Termination criteria
     std::optional<uint64_t> maxExplorationSize = std::nullopt;

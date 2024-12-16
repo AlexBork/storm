@@ -391,7 +391,7 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
         storm::models::sparse::StandardRewardModel<BeliefMdpValueType> rewardModel(std::nullopt, std::move(actionRewards));
         components.rewardModels.emplace(propertyInformation.rewardModelName.value(), std::move(rewardModel));
     }
-    if(optionalChoiceLabeling.has_value()) {
+    if (optionalChoiceLabeling.has_value()) {
         components.choiceLabeling = optionalChoiceLabeling.value();
     }
 

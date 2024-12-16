@@ -1,6 +1,7 @@
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
 
 #include <memory>
+#include <storm/api/export.h>
 
 #include "storm-pomdp/beliefs/abstraction/FreudenthalTriangulationBeliefAbstraction.h"
 #include "storm-pomdp/beliefs/abstraction/RewardBoundedBeliefSplitter.h"
@@ -219,6 +220,7 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     storm::utility::Stopwatch swCheck(true);
     auto formula = createFormulaForBeliefMdp(propertyInformation);
     storm::modelchecker::CheckTask<storm::logic::Formula, BeliefMdpValueType> task(*formula, true);
+    task.setProduceSchedulers(options.generatePolicy);
     std::unique_ptr<storm::modelchecker::CheckResult> res(storm::api::verifyWithSparseEngine<BeliefMdpValueType>(env, beliefMdp, task));
     swCheck.stop();
     STORM_PRINT_AND_LOG("Time for exploring beliefs: " << swExplore << ".\n");
@@ -228,6 +230,13 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     STORM_LOG_ASSERT(res->isExplicitQuantitativeCheckResult(), "Model checking of belief MDP did not return result of expected type.");
     STORM_LOG_ASSERT(beliefMdp->getInitialStates().getNumberOfSetBits() == 1, "Unexpected number of initial states for belief Mdp.");
     auto const initState = beliefMdp->getInitialStates().getNextSetIndex(0);
+    if (options.generatePolicy) {
+        // TODO: Implement policy extraction
+        STORM_LOG_ASSERT(res->asQuantitativeCheckResult<BeliefMdpValueType>().hasScheduler() && options.buildChoiceLabeling,
+                         "Model checking of belief MDP did not return a policy.");
+        storm::api::exportScheduler(std::static_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(beliefMdp),
+                                    res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>().getScheduler(), "/Users/bork/Desktop/policy.json");
+    }
     return {res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>()[initState], !earlyExplorationStop};
 }
 
