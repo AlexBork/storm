@@ -9,7 +9,8 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::PolicyExtr
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
-ObservationBasedFiniteStateController<typename PomdpModelType::ValueType> PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPolicyAsFiniteStateController() const {
+ObservationBasedFiniteStateController<typename PomdpModelType::ValueType>
+PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPolicyAsFiniteStateController() const {
     return;
 }
 

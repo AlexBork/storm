@@ -14,17 +14,17 @@ class Scheduler;
 namespace pomdp::policy {
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
 class PolicyExtractor {
-  using BeliefType = storm::pomdp::beliefs::Belief<BeliefValueType>;
-  using BeliefMdpType = storm::models::sparse::Mdp<BeliefMdpValueType>;
+    using BeliefType = storm::pomdp::beliefs::Belief<BeliefValueType>;
+    using BeliefMdpType = storm::models::sparse::Mdp<BeliefMdpValueType>;
 
-public:
-  PolicyExtractor(PomdpModelType const& pomdp, BeliefMdpType const& beliefMdp, storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler);
+   public:
+    PolicyExtractor(PomdpModelType const& pomdp, BeliefMdpType const& beliefMdp, storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler);
 
-  ObservationBasedFiniteStateController<typename PomdpModelType::ValueType> exportPolicyAsFiniteStateController() const;
+    ObservationBasedFiniteStateController<typename PomdpModelType::ValueType> exportPolicyAsFiniteStateController() const;
 
-private:
-  BeliefMdpType const& beliefMdp;
-  storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler;
+   private:
+    BeliefMdpType const& beliefMdp;
+    storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler;
 };
-}
-}
+}  // namespace pomdp::policy
+}  // namespace storm

@@ -17,7 +17,7 @@ struct FSCOutputUpdate {
 template<typename ValueType>
 struct RandomisedActionUpdate final : FSCOutputUpdate {
     storm::storage::Distribution<ValueType, uint64_t> actionDistribution;
-     bool randomisedActionOutput() const override {
+    bool randomisedActionOutput() const override {
         return true;
     }
 };
@@ -45,7 +45,8 @@ class ObservationBasedFiniteStateController {
     uint64_t getActionForObservationInNode(uint64_t const originId, uint64_t const observationId) const;
     uint64_t getSuccessorForObservationInNode(uint64_t const originId, uint64_t const observationId) const;
 
-    std::pair<storm::storage::Distribution<ValueType, uint64_t>, uint64_t> getActionDistributionAndSuccessorForObservationInNode(uint64_t const originId, uint64_t const observationId) const;
+    std::pair<storm::storage::Distribution<ValueType, uint64_t>, uint64_t> getActionDistributionAndSuccessorForObservationInNode(
+        uint64_t const originId, uint64_t const observationId) const;
     storm::storage::Distribution<ValueType, uint64_t> getActionDistributionForObservationInNode(uint64_t const originId, uint64_t const observationId) const;
 
     bool hasOutputForObservationInNode(uint64_t const originId, uint64_t const observationId) const;
@@ -73,5 +74,5 @@ class ObservationBasedFiniteStateController {
     bool isDeterministicPolicy = true;
 };
 
-}  // namespace pomdp::storage
+}  // namespace pomdp::policy
 }  // namespace storm

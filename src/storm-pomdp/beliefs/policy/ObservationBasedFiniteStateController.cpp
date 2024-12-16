@@ -1,8 +1,7 @@
 #include "ObservationBasedFiniteStateController.h"
 
-#include <storm/utility/macros.h>
 #include <storm/utility/constants.h>
-
+#include <storm/utility/macros.h>
 
 namespace storm::pomdp::policy {
 
@@ -52,8 +51,9 @@ uint64_t ObservationBasedFiniteStateController<ValueType>::getSuccessorForObserv
 }
 
 template<typename ValueType>
-std::pair<storm::storage::Distribution<ValueType, uint64_t>, uint64_t> ObservationBasedFiniteStateController<ValueType>::getActionDistributionAndSuccessorForObservationInNode(uint64_t const originId,
-                                                                                                                          uint64_t const observationId) const {
+std::pair<storm::storage::Distribution<ValueType, uint64_t>, uint64_t>
+ObservationBasedFiniteStateController<ValueType>::getActionDistributionAndSuccessorForObservationInNode(uint64_t const originId,
+                                                                                                        uint64_t const observationId) const {
     if (FSCOutputUpdate const& outputUpdate = getActionOutputUpdate(originId, observationId); outputUpdate.randomisedActionOutput()) {
         auto const& randActionUpdate = dynamic_cast<RandomisedActionUpdate<ValueType> const&>(outputUpdate);
         return {randActionUpdate.actionDistribution, randActionUpdate.nextMemoryNode};
@@ -66,7 +66,8 @@ std::pair<storm::storage::Distribution<ValueType, uint64_t>, uint64_t> Observati
 }
 
 template<typename ValueType>
-storm::storage::Distribution<ValueType, uint64_t> ObservationBasedFiniteStateController<ValueType>::getActionDistributionForObservationInNode(uint64_t const originId, uint64_t const observationId) const {
+storm::storage::Distribution<ValueType, uint64_t> ObservationBasedFiniteStateController<ValueType>::getActionDistributionForObservationInNode(
+    uint64_t const originId, uint64_t const observationId) const {
     return getActionAndSuccessorForObservationInNode(originId, observationId).first;
 }
 
@@ -134,4 +135,4 @@ bool ObservationBasedFiniteStateController<ValueType>::outputIsRandomised(uint64
     return transitions.at(originId).at(observationId).randomisedActionOutput();
 }
 
-}  // namespace storm::pomdp::storage
+}  // namespace storm::pomdp::policy
