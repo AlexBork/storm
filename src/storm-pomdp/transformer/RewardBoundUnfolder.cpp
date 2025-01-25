@@ -1,12 +1,12 @@
 #include "RewardBoundUnfolder.h"
 
 #include <queue>
-#include "storm/exceptions/UnsupportedModelException.h"
-#include "storm/logic/RemoveBoundVisitor.h"
-#include "storm/storage/jani/Property.h"
 #include "storm-pomdp/analysis/FormulaInformation.h"
 #include "storm/adapters/RationalFunctionAdapter.h"
 #include "storm/exceptions/NotSupportedException.h"
+#include "storm/exceptions/UnsupportedModelException.h"
+#include "storm/logic/RemoveBoundVisitor.h"
+#include "storm/storage/jani/Property.h"
 
 namespace storm::pomdp::transformer {
 template<typename ValueType>

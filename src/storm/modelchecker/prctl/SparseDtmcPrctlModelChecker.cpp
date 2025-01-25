@@ -203,8 +203,7 @@ std::unique_ptr<CheckResult> SparseDtmcPrctlModelChecker<SparseDtmcModelType>::c
 
 template<>
 std::unique_ptr<CheckResult> SparseDtmcPrctlModelChecker<storm::models::sparse::Dtmc<storm::RationalFunction>>::computeDiscountedCumulativeRewards(
-    Environment const& env,
-    CheckTask<storm::logic::DiscountedCumulativeRewardFormula, storm::RationalFunction> const& checkTask) {
+    Environment const& env, CheckTask<storm::logic::DiscountedCumulativeRewardFormula, storm::RationalFunction> const& checkTask) {
     STORM_LOG_THROW(false, storm::exceptions::NotImplementedException, "Discounted properties are not implemented for parametric models.");
 }
 
