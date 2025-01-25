@@ -1,10 +1,8 @@
 #pragma once
 
-#include <utility>
-#include "logic/ProbabilityOperatorFormula.h"
-#include "logic/QuantileFormula.h"
-#include "logic/TimeBoundType.h"
-#include "models/sparse/Pomdp.h"
+#include "storm/logic/ProbabilityOperatorFormula.h"
+#include "storm/logic/QuantileFormula.h"
+#include "storm/models/sparse/Pomdp.h"
 
 namespace storm::pomdp::transformer {
 template<typename ValueType>

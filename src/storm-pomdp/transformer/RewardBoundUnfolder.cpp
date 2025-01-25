@@ -1,10 +1,9 @@
 #include "RewardBoundUnfolder.h"
 
 #include <queue>
-#include "exceptions/UnsupportedModelException.h"
-#include "logic/RemoveBoundVisitor.h"
-#include "logic/UntilFormula.h"
-#include "storage/jani/Property.h"
+#include "storm/exceptions/UnsupportedModelException.h"
+#include "storm/logic/RemoveBoundVisitor.h"
+#include "storm/storage/jani/Property.h"
 #include "storm-pomdp/analysis/FormulaInformation.h"
 #include "storm/adapters/RationalFunctionAdapter.h"
 #include "storm/exceptions/NotSupportedException.h"
