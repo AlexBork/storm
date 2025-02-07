@@ -146,7 +146,7 @@ storm::pomdp::storage::BeliefExplorationResult<BeliefMDPType> BeliefExplorationP
                 components.stateLabeling = pomdp().getStateLabeling();
                 components.rewardModels = pomdp().getRewardModels();
                 auto matrix = pomdp().getTransitionMatrix();
-                matrix.makeRowGroupsAbsorbing(formulaInfo.getSinkStates().states);
+                matrix.makeRowGroupsAbsorbing(formulaInfo.getSinkStates().states, true);
                 components.transitionMatrix = matrix;
                 components.observabilityClasses = pomdp().getObservations();
                 if (pomdp().hasChoiceLabeling()) {

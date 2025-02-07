@@ -28,6 +28,8 @@
 #include "storm-pomdp/transformer/MakePOMDPCanonic.h"
 #include "storm-pomdp/transformer/PomdpMemoryUnfolder.h"
 #include "storm-pomdp/transformer/RewardBoundUnfolder.h"
+#include "storm-pomdp/transformer/RewardBoundUnfolder2.h"
+#include "storm-pomdp/transformer/ToStateBasedObservationTransformer.h"
 #include "storm/api/storm.h"
 #include "storm/modelchecker/results/ExplicitQualitativeCheckResult.h"
 #include "storm/utility/NumberTraits.h"
@@ -421,32 +423,51 @@ void processOptionsWithValueTypeAndDdLib(storm::cli::SymbolicInput const& symbol
 
     if (formula) {
         if (formula->asOperatorFormula().getSubformula().isBoundedUntilFormula()) {
+            // Process bounded until formulas
+            // If level widths are given, unfold the levels and make sure that the level rewards (and only those) are made observable
+            // If explicit unfolding is requested, unfold all reward bounds (if levels were unfolded before, this means a second round of unfolding)
+            // If reward observability is set and no level widths are given, make all rewards occuring in the formula observable. This also happens if no
+            // unfolding was requested.
+            storm::utility::Stopwatch boundedUntilProcessingWatch(true);
+            auto const levelWidths = pomdpSettings.getLevelWidthForBoundedReachability();
+            if (!levelWidths.empty()) {
+                STORM_PRINT_AND_LOG("Perform unfolding for observation levels.\n");
+                // Unfold the levels (includes dimensions with level-width 0)
+                typename transformer::RewardBoundUnfolder2<ValueType>::UnfoldingOptions options;
+                options.levelWidths = levelWidths;
+                auto const unfoldingResult = transformer::RewardBoundUnfolder2<ValueType>::transform(*pomdp, *formula, options);
+                pomdp = unfoldingResult.model->template as<storm::models::sparse::Pomdp<ValueType>>();
+                formula = unfoldingResult.formula;
+                // make sure the levels are observable
+                std::set<std::string> levelRewardModels;
+                formula->gatherReferencedRewardModels(levelRewardModels);
+                pomdp = storm::pomdp::transformer::ToStateBasedObservationTransformer<ValueType>::transformRewardAware(*pomdp, levelRewardModels);
+            }
+            std::set<std::string> rewardModelsToObserve;
+            if (pomdpSettings.isRewardObservableSet() && levelWidths.empty()) {
+                formula->gatherReferencedRewardModels(rewardModelsToObserve);  // keep rewards to make them observable later
+            }
             if (pomdpSettings.isBoundedToUnboundedReachabilityTransformationSet()) {
                 STORM_PRINT_AND_LOG("Perform explicit unfolding of reward bounds.\n");
-                storm::utility::Stopwatch unfoldingWatch(true);
-                transformer::RewardBoundUnfolder<ValueType> rewardBoundUnfolder;
-                if (!pomdpSettings.isRewardObservableSet()) {
-                    typename transformer::RewardBoundUnfolder<ValueType>::UnfoldingResult unfoldingResult = rewardBoundUnfolder.unfold(pomdp, *formula);
-                    pomdp = unfoldingResult.pomdp;
-                    formula = unfoldingResult.formula;
-                } else {
-                    STORM_PRINT_AND_LOG("Use reward-aware unfolding.\n");
-                    typename transformer::RewardBoundUnfolder<ValueType>::RewardAwareUnfoldingResult unfoldingResult =
-                        rewardBoundUnfolder.unfoldRewardAware(pomdp, *formula);
-                    pomdp = unfoldingResult.pomdp;
-                    formula = unfoldingResult.formula;
-                }
-
-                STORM_PRINT_AND_LOG("Unfolding POMDP Information:\n");
-                pomdp->printModelInformationToStream(std::cout);
-                STORM_PRINT_AND_LOG("Transformed formula: " << *formula << "\n");
-                unfoldingWatch.stop();
-                STORM_PRINT_AND_LOG("Time for explicit reward bound unfolding: " << unfoldingWatch << ".\n");
-            } else {
-                STORM_LOG_WARN_COND(pomdpSettings.isRewardObservableSet(),
-                                    "Implicitly assuming reward bounds are observable. Use `--unfold-reward-bound` to support unobservable rewards. Use "
-                                    "`--reward-aware` to silence this warning.");
+                typename transformer::RewardBoundUnfolder2<ValueType>::UnfoldingOptions options;
+                options.preservedRewardModels = rewardModelsToObserve;
+                auto const unfoldingResult = transformer::RewardBoundUnfolder2<ValueType>::transform(*pomdp, *formula, options);
+                pomdp = unfoldingResult.model->template as<storm::models::sparse::Pomdp<ValueType>>();
+                formula = unfoldingResult.formula;
             }
+            if (pomdpSettings.isRewardObservableSet() && levelWidths.empty()) {
+                STORM_PRINT_AND_LOG("Extend observation function to become reward aware.\n");
+                pomdp = storm::pomdp::transformer::ToStateBasedObservationTransformer<ValueType>::transformRewardAware(*pomdp, rewardModelsToObserve);
+            }
+            STORM_LOG_THROW(!levelWidths.empty() || pomdpSettings.isRewardObservableSet() || pomdpSettings.isBoundedToUnboundedReachabilityTransformationSet(),
+                            storm::exceptions::InvalidSettingsException,
+                            "No handling of bounded until formulas specified. Consider setting --unfold-reward-bound and/or --reward-aware.");
+
+            STORM_PRINT_AND_LOG("bounded reachability processing done. POMDP Information:\n");
+            pomdp->printModelInformationToStream(std::cout);
+            STORM_PRINT_AND_LOG("Transformed formula: " << *formula << "\n");
+            boundedUntilProcessingWatch.stop();
+            STORM_PRINT_AND_LOG("Time for pre-processing: " << boundedUntilProcessingWatch << ".\n");
         }
         auto formulaInfo = storm::pomdp::analysis::getFormulaInformation(*pomdp, *formula);
         STORM_LOG_THROW(!formulaInfo.isUnsupported(), storm::exceptions::InvalidPropertyException,

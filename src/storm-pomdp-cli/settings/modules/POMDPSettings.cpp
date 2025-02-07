@@ -1,5 +1,7 @@
 #include "storm-pomdp-cli/settings/modules/POMDPSettings.h"
 
+#include <ranges>
+
 #include "storm/settings/ArgumentBuilder.h"
 #include "storm/settings/Option.h"
 #include "storm/settings/OptionBuilder.h"
@@ -72,6 +74,10 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
                         .build());
     this->addOption(storm::settings::OptionBuilder(moduleName, isRewardObservableOption, false,
                                                    "Sets the option that rewards are observable for bounded reachability properties.")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument("levelwidths", "comma separated list of width of reward levels.")
+                                         .setDefaultValueString("")
+                                         .makeOptional()
+                                         .build())
                         .build());
 }
 
@@ -127,6 +133,17 @@ bool POMDPSettings::isBoundedToUnboundedReachabilityTransformationSet() const {
 
 bool POMDPSettings::isRewardObservableSet() const {
     return this->getOption(isRewardObservableOption).getHasOptionBeenSet();
+}
+
+std::vector<uint64_t> POMDPSettings::getLevelWidthForBoundedReachability() const {
+    auto const input = this->getOption(isRewardObservableOption).getArgumentByName("levelwidths").getValueAsString();
+    if (input.empty()) {
+        return {};
+    }
+    // split the string by comma
+    auto result = input | std::ranges::views::split(',') |
+                  std::ranges::views::transform([](auto&& r) -> uint64_t { return std::stoull(std::string(r.begin(), r.end())); });
+    return {result.begin(), result.end()};
 }
 
 uint64_t POMDPSettings::getMemoryBound() const {
