@@ -1,5 +1,7 @@
 #include "storm-pomdp/transformer/RewardBoundUnfolder2.h"
 
+#include <queue>
+
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/logic/AtomicLabelFormula.h"
 #include "storm/logic/BinaryBooleanStateFormula.h"
