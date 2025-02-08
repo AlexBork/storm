@@ -181,12 +181,9 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     auto const initialObservation = pomdp.getObservation(pomdp.getInitialStates().getNextSetIndex(0));
 
     struct TransitionObservation {
-        ObservationType srcStateObservation, targetStateObservation;
+        ObservationType targetStateObservation;
         std::vector<ValueType> rewards;
         bool operator<(TransitionObservation const& other) const {
-            if (srcStateObservation != other.srcStateObservation) {
-                return srcStateObservation < other.srcStateObservation;
-            }
             if (targetStateObservation != other.targetStateObservation) {
                 return targetStateObservation < other.targetStateObservation;
             }
@@ -205,12 +202,12 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     auto result = transform(
         pomdp,
         [&pomdp, &getOrAddObservationIndex, &observableRewardModels](StateIdType srcState, ActionIdType action, StateIdType targetState) {
-            TransitionObservation obs{pomdp.getObservation(srcState), pomdp.getObservation(targetState), {}};
+            TransitionObservation obs{pomdp.getObservation(targetState), {}};
             for (auto const& rewName : observableRewardModels) {
                 auto const& rewModel = pomdp.getRewardModel(rewName);
                 obs.rewards.push_back(storm::utility::zero<ValueType>());
                 if (rewModel.hasStateRewards()) {
-                    obs.rewards.back() += rewModel.getStateReward(targetState);
+                    obs.rewards.back() += rewModel.getStateReward(srcState);
                 }
                 if (rewModel.hasStateActionRewards()) {
                     obs.rewards.back() += rewModel.getStateActionReward(action);
