@@ -20,3 +20,13 @@ std::string trim(const std::string& str) {
     size_t last = str.find_last_not_of(" \t\n\r");
     return (first == std::string::npos || last == std::string::npos) ? "" : str.substr(first, last - first + 1);
 }
+
+template<typename ValueType>
+ValueType convertToValueType(const std::string& s) {
+    std::istringstream iss(s);
+    ValueType val;
+    if (!(iss >> val)) {
+        throw std::runtime_error("Conversion error: cannot convert \"" + s + "\" to the desired numeric type.");
+    }
+    return val;
+}

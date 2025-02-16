@@ -14,29 +14,6 @@ class StandardRewardModel;
 namespace pomdp {
 namespace parser {
 
-struct PomdpData {
-    double discountFactor;
-    std::vector<std::string> states;
-    std::vector<std::string> actions;
-    std::vector<std::string> observations;
-    std::unordered_map<std::string, double> transitionProbabilities;
-    std::unordered_map<std::string, double> observationProbabilities;
-    std::unordered_map<std::string, double> rewards;
-};
-
-template<typename ValueType>
-struct IntermediatePomdpData {
-    std::unordered_map<std::tuple<int, int, int>, ValueType> transitions; // [state, action, next_state] -> probability
-    std::unordered_map<std::tuple<int, int, int>, ValueType> rewards; // [state, action, next_state] -> reward
-    std::vector<ValueType> startStateDistribution; // Initial state distribution
-};
-
-// Declaration of the global variable to store POMDP data.
-extern PomdpData globalPomdpData;
-
-// Function to parse the POMDP file and populate the global data structure.
-void parsePomdpFile(const std::string& filename);
-
 template<typename ValueType>
 struct PomdpSolveParserResult {
     std::shared_ptr<storm::models::sparse::Pomdp<ValueType, storm::models::sparse::StandardRewardModel<ValueType>>> pomdp;
