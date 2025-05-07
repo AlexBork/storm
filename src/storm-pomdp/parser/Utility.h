@@ -2,6 +2,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "storm-parsers/parser/ValueParser.h"
 
 const std::vector<std::string> POMDP_KEYWORDS = {
     "discount", "values", "states", "actions", "observations", "start include", "start exclude", "start", "T", "O", "R",
@@ -45,10 +46,8 @@ inline bool isIgnoredLine(const std::string& line) {
 template<typename ValueType>
 ValueType convertToValueType(const std::string& s) {
     std::istringstream iss(s);
-    ValueType val;
-    if (!(iss >> val)) {
-        throw std::runtime_error("Conversion error: cannot convert \"" + s + "\" to the desired numeric type.");
-    }
+    storm::parser::ValueParser<ValueType> valueParser;
+    ValueType val = valueParser.parseValue(s);
     return val;
 }
 

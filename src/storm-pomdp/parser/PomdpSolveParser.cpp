@@ -69,7 +69,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
         return pomdp;
     }
     std::string line;
-    STORM_PRINT("Starting to parse file");
 
     while (std::getline(infile, line)) {
         if (isIgnoredLine(line))
@@ -97,11 +96,8 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
         } else if (word == "actions") {
             parseIdentifierVector(iss, pomdp.actions, "action", infile);
         } else if (word == "observations") {
-            STORM_PRINT("Parsing observations");
             parseIdentifierVector(iss, pomdp.observations, "observation", infile);
         } else if (word == "start include") {
-            STORM_PRINT("Parsing start include directive\n");
-
             if (pomdp.start_state_mask.empty()) {
                 pomdp.start_state_mask.resize(pomdp.states.size(), false);
             }
@@ -119,8 +115,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                     int stateIdx = std::stoi(stateName);
                     if (stateIdx >= 0 && stateIdx < pomdp.states.size()) {
                         pomdp.start_state_mask[stateIdx] = true;
-                    } else {
-                        STORM_PRINT("Warning: Invalid state index in start include: " + stateName + "\n");
                     }
                 } else {
                     // Try to find by name
@@ -128,14 +122,10 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                     if (it != pomdp.states.end()) {
                         int idx = std::distance(pomdp.states.begin(), it);
                         pomdp.start_state_mask[idx] = true;
-                    } else {
-                        STORM_PRINT("Warning: Unknown state name in start include: " + stateName + "\n");
                     }
                 }
             }
         } else if (word == "start exclude") {
-            STORM_PRINT("Parsing start exclude directive");
-
             if (pomdp.start_state_mask.empty()) {
                 pomdp.start_state_mask.resize(pomdp.states.size(), true);
             }
@@ -153,8 +143,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                     int stateIdx = std::stoi(stateName);
                     if (stateIdx >= 0 && stateIdx < pomdp.states.size()) {
                         pomdp.start_state_mask[stateIdx] = false;
-                    } else {
-                        STORM_PRINT("Warning: Invalid state index in start exclude: " + stateName + "\n");
                     }
                 } else {
                     // Try to find by name
@@ -162,21 +150,16 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                     if (it != pomdp.states.end()) {
                         int idx = std::distance(pomdp.states.begin(), it);
                         pomdp.start_state_mask[idx] = false;
-                    } else {
-                        STORM_PRINT("Warning: Unknown state name in start exclude: " + stateName + "\n");
                     }
                 }
             }
         } else if (word == "start") {
-            STORM_PRINT("Parsing start directive\n");
-
             std::string token;
             if (iss >> token) {
                 if (token == "uniform") {
                     // uniform is handled later
                     continue;
                 }
-                STORM_PRINT("Parsing start directive with token: \n");
 
                 // single state name
                 auto it = std::find(pomdp.states.begin(), pomdp.states.end(), token);
@@ -184,7 +167,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                     pomdp.start_state_mask.resize(pomdp.states.size(), false);
                     int idx = std::distance(pomdp.states.begin(), it);
                     pomdp.start_state_mask[idx] = true;
-                    STORM_PRINT("Parsed start directive state\n");
                     continue;
                 }
 
@@ -195,7 +177,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                     if (stateIdx >= 0 && stateIdx < pomdp.states.size()) {
                         pomdp.start_state_mask.resize(pomdp.states.size(), false);
                         pomdp.start_state_mask[stateIdx] = true;
-                        STORM_PRINT("Parsed start directive index\n");
                         continue;
                     }
                 }
@@ -204,10 +185,7 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
 
             std::vector<ValueType> startProbs = readArrayTokens<ValueType>(iss, infile);
             pomdp.start_probabilities = startProbs;
-            STORM_PRINT("Parsed start directive probabilities\n");
         } else if (word == "T") {
-            STORM_PRINT("Parsing transition(s)");
-
             std::string rest = afterColon;
             rest = trim(rest);
             int colonCount = std::count(rest.begin(), rest.end(), ':');
@@ -239,27 +217,23 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                         if (nextLineStream >> probability_token) {
                             probability = convertToValueType<ValueType>(probability_token);
                         } else {
-                            STORM_PRINT("Error: Invalid probability format for T: " + action + " : " + start_state + " : " + end_state + "\n");
                             continue;
                         }
                     } else {
-                        STORM_PRINT("Error: Missing probability value for T: " + action + " : " + start_state + " : " + end_state + "\n");
                         continue;
                     }
                 }
 
-                if (probability != storm::utility::zero<ValueType>()) {
-                    if (action == "*") {
-                        for (const auto& act : pomdp.actions) {
-                            pomdp.transitions[act][start_state + ":" + end_state] = probability;
-                        }
-                    } else if (start_state == "*") {
-                        for (const auto& state : pomdp.states) {
-                            pomdp.transitions[action][state + ":" + end_state] = probability;
-                        }
-                    } else {
-                        pomdp.transitions[action][start_state + ":" + end_state] = probability;
+                if (action == "*") {
+                    for (const auto& act : pomdp.actions) {
+                        pomdp.transitions[act][start_state + ":" + end_state] = probability;
                     }
+                } else if (start_state == "*") {
+                    for (const auto& state : pomdp.states) {
+                        pomdp.transitions[action][state + ":" + end_state] = probability;
+                    }
+                } else {
+                    pomdp.transitions[action][start_state + ":" + end_state] = probability;
                 }
             } else if (colonCount == 1) {
                 // <action> : <start-state> <p1> <p2> ...
@@ -272,14 +246,12 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
 
                 std::vector<ValueType> probabilities = readArrayTokens<ValueType>(restStream, infile);
                 for (uint64_t i = 0; i < pomdp.states.size(); i++) {
-                    if (probabilities[i] != storm::utility::zero<ValueType>()) {
-                        if (action == "*") {
-                            for (const auto& act : pomdp.actions) {
-                                pomdp.transitions[act][start_state + ":" + pomdp.states[i]] = probabilities[i];
-                            }
-                        } else {
-                            pomdp.transitions[action][start_state + ":" + pomdp.states[i]] = probabilities[i];
+                    if (action == "*") {
+                        for (const auto& act : pomdp.actions) {
+                            pomdp.transitions[act][start_state + ":" + pomdp.states[i]] = probabilities[i];
                         }
+                    } else {
+                        pomdp.transitions[action][start_state + ":" + pomdp.states[i]] = probabilities[i];
                     }
                 }
             } else {
@@ -329,14 +301,12 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                         std::string token;
                         rowStream >> token;
                         ValueType prob = convertToValueType<ValueType>(token);
-                        if (prob != storm::utility::zero<ValueType>()) {
-                            if (action == "*") {
-                                for (const auto& act : pomdp.actions) {
-                                    pomdp.transitions[act][pomdp.states[0] + ":" + pomdp.states[j]] = prob;
-                                }
-                            } else {
-                                pomdp.transitions[action][pomdp.states[0] + ":" + pomdp.states[j]] = prob;
+                        if (action == "*") {
+                            for (const auto& act : pomdp.actions) {
+                                pomdp.transitions[act][pomdp.states[0] + ":" + pomdp.states[j]] = prob;
                             }
+                        } else {
+                            pomdp.transitions[action][pomdp.states[0] + ":" + pomdp.states[j]] = prob;
                         }
                     }
 
@@ -351,22 +321,18 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                             std::string token;
                             rowStream >> token;
                             ValueType prob = convertToValueType<ValueType>(token);
-                            if (prob != storm::utility::zero<ValueType>()) {
-                                if (action == "*") {
-                                    for (const auto& act : pomdp.actions) {
-                                        pomdp.transitions[act][pomdp.states[i] + ":" + pomdp.states[j]] = prob;
-                                    }
-                                } else {
-                                    pomdp.transitions[action][pomdp.states[i] + ":" + pomdp.states[j]] = prob;
+                            if (action == "*") {
+                                for (const auto& act : pomdp.actions) {
+                                    pomdp.transitions[act][pomdp.states[i] + ":" + pomdp.states[j]] = prob;
                                 }
+                            } else {
+                                pomdp.transitions[action][pomdp.states[i] + ":" + pomdp.states[j]] = prob;
                             }
                         }
                     }
                 }
             }
         } else if (word == "O") {
-            STORM_PRINT("Parsing observation probabilities \n");
-
             std::string rest = afterColon;
             rest = trim(rest);
             int colonCount = std::count(rest.begin(), rest.end(), ':');
@@ -397,11 +363,9 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                         if (nextLineStream >> probability_token) {
                             probability = convertToValueType<ValueType>(probability_token);
                         } else {
-                            STORM_PRINT("Error: Invalid probability format for O: " + action + " : " + end_state + " : " + observation + "\n");
                             continue;
                         }
                     } else {
-                        STORM_PRINT("Error: Missing probability value for O: " + action + " : " + end_state + " : " + observation + "\n");
                         continue;
                     }
                 }
@@ -472,7 +436,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                             }
                         }
                     } else {
-                        STORM_PRINT("Error: Identity matrix for observations requires equal number of states and observations.");
                         continue;
                     }
                 } else if (matrixType == MatrixType::UNIFORM) {
@@ -494,14 +457,12 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                         std::string token;
                         rowStream >> token;
                         ValueType prob = convertToValueType<ValueType>(token);
-                        if (prob != storm::utility::zero<ValueType>()) {
-                            if (action == "*") {
-                                for (const auto& act : pomdp.actions) {
-                                    pomdp.observations_prob[act][pomdp.states[0] + ":" + pomdp.observations[j]] = prob;
-                                }
-                            } else {
-                                pomdp.observations_prob[action][pomdp.states[0] + ":" + pomdp.observations[j]] = prob;
+                        if (action == "*") {
+                            for (const auto& act : pomdp.actions) {
+                                pomdp.observations_prob[act][pomdp.states[0] + ":" + pomdp.observations[j]] = prob;
                             }
+                        } else {
+                            pomdp.observations_prob[action][pomdp.states[0] + ":" + pomdp.observations[j]] = prob;
                         }
                     }
 
@@ -516,21 +477,18 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                             std::string token;
                             rowStream >> token;
                             ValueType prob = convertToValueType<ValueType>(token);
-                            if (prob != storm::utility::zero<ValueType>()) {
-                                if (action == "*") {
-                                    for (const auto& act : pomdp.actions) {
-                                        pomdp.observations_prob[act][pomdp.states[i] + ":" + pomdp.observations[j]] = prob;
-                                    }
-                                } else {
-                                    pomdp.observations_prob[action][pomdp.states[i] + ":" + pomdp.observations[j]] = prob;
+                            if (action == "*") {
+                                for (const auto& act : pomdp.actions) {
+                                    pomdp.observations_prob[act][pomdp.states[i] + ":" + pomdp.observations[j]] = prob;
                                 }
+                            } else {
+                                pomdp.observations_prob[action][pomdp.states[i] + ":" + pomdp.observations[j]] = prob;
                             }
                         }
                     }
                 }
             }
         } else if (word == "R") {
-            STORM_PRINT("Parsing rewards");
             std::string headerLine = afterColon;
             headerLine = trim(headerLine);
             size_t colonCount = std::count(headerLine.begin(), headerLine.end(), ':');
@@ -565,11 +523,9 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                         if (nextLineStream >> rewardStr) {
                             rewardVal = convertToValueType<ValueType>(rewardStr);
                         } else {
-                            STORM_PRINT("Error: Invalid reward format for R: " + action + " : " + start_state + " : " + end_state + " : " + observation + "\n");
                             continue;
                         }
                     } else {
-                        STORM_PRINT("Error: Missing reward value for R: " + action + " : " + start_state + " : " + end_state + " : " + observation + "\n");
                         continue;
                     }
                 }
@@ -603,7 +559,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                         for (const auto& es : endStatesToUse) {
                             for (const auto& obs : observationsToUse) {
                                 pomdp.rewards[ss][act + ":" + es + ":" + obs] = rewardVal;
-                                STORM_PRINT("Created reward for key: " + act + ":" + es + ":" + obs + " under start state: " + ss + "\n");
                             }
                         }
                     }
@@ -626,16 +581,14 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                     for (const auto& s : pomdp.states) {
                         if (end_state == "*") {
                             for (size_t i = 0; i < pomdp.states.size() && i < rewardsVec.size(); ++i) {
-                                if (rewardsVec[i] != storm::utility::zero<ValueType>()) {
-                                    if (action == "*") {
-                                        for (const auto& act : pomdp.actions) pomdp.rewards[s][act + ":" + pomdp.states[i]] = rewardsVec[i];
-                                    } else {
-                                        pomdp.rewards[s][action + ":" + pomdp.states[i]] = rewardsVec[i];
-                                    }
+                                if (action == "*") {
+                                    for (const auto& act : pomdp.actions) pomdp.rewards[s][act + ":" + pomdp.states[i]] = rewardsVec[i];
+                                } else {
+                                    pomdp.rewards[s][action + ":" + pomdp.states[i]] = rewardsVec[i];
                                 }
                             }
                         } else {
-                            if (!rewardsVec.empty() && rewardsVec[0] != storm::utility::zero<ValueType>()) {
+                            if (!rewardsVec.empty()) {
                                 if (action == "*") {
                                     for (const auto& act : pomdp.actions) pomdp.rewards[s][act + ":" + end_state] = rewardsVec[0];
                                 } else {
@@ -647,16 +600,14 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                 } else {
                     if (end_state == "*") {
                         for (size_t i = 0; i < pomdp.states.size() && i < rewardsVec.size(); ++i) {
-                            if (rewardsVec[i] != storm::utility::zero<ValueType>()) {
-                                if (action == "*") {
-                                    for (const auto& act : pomdp.actions) pomdp.rewards[start_state][act + ":" + pomdp.states[i]] = rewardsVec[i];
-                                } else {
-                                    pomdp.rewards[start_state][action + ":" + pomdp.states[i]] = rewardsVec[i];
-                                }
+                            if (action == "*") {
+                                for (const auto& act : pomdp.actions) pomdp.rewards[start_state][act + ":" + pomdp.states[i]] = rewardsVec[i];
+                            } else {
+                                pomdp.rewards[start_state][action + ":" + pomdp.states[i]] = rewardsVec[i];
                             }
                         }
                     } else {
-                        if (!rewardsVec.empty() && rewardsVec[0] != storm::utility::zero<ValueType>()) {
+                        if (!rewardsVec.empty()) {
                             if (action == "*") {
                                 for (const auto& act : pomdp.actions) pomdp.rewards[start_state][act + ":" + end_state] = rewardsVec[0];
                             } else {
@@ -734,12 +685,10 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                                 std::string token;
                                 firstRowStream >> token;
                                 ValueType val = convertToValueType<ValueType>(token);
-                                if (val != storm::utility::zero<ValueType>()) {
-                                    if (action == "*") {
-                                        for (const auto& act : pomdp.actions) pomdp.rewards[s][act + ":" + pomdp.states[j]] = val;
-                                    } else {
-                                        pomdp.rewards[s][action + ":" + pomdp.states[j]] = val;
-                                    }
+                                if (action == "*") {
+                                    for (const auto& act : pomdp.actions) pomdp.rewards[s][act + ":" + pomdp.states[j]] = val;
+                                } else {
+                                    pomdp.rewards[s][action + ":" + pomdp.states[j]] = val;
                                 }
                             }
 
@@ -755,12 +704,10 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                                     std::string token;
                                     rowStream >> token;
                                     ValueType val = convertToValueType<ValueType>(token);
-                                    if (val != storm::utility::zero<ValueType>()) {
-                                        if (action == "*") {
-                                            for (const auto& act : pomdp.actions) pomdp.rewards[s][act + ":" + pomdp.states[j]] = val;
-                                        } else {
-                                            pomdp.rewards[s][action + ":" + pomdp.states[j]] = val;
-                                        }
+                                    if (action == "*") {
+                                        for (const auto& act : pomdp.actions) pomdp.rewards[s][act + ":" + pomdp.states[j]] = val;
+                                    } else {
+                                        pomdp.rewards[s][action + ":" + pomdp.states[j]] = val;
                                     }
                                 }
                             }
@@ -770,12 +717,10 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                             std::string token;
                             firstRowStream >> token;
                             ValueType val = convertToValueType<ValueType>(token);
-                            if (val != storm::utility::zero<ValueType>()) {
-                                if (action == "*") {
-                                    for (const auto& act : pomdp.actions) pomdp.rewards[start_state][act + ":" + pomdp.states[j]] = val;
-                                } else {
-                                    pomdp.rewards[start_state][action + ":" + pomdp.states[j]] = val;
-                                }
+                            if (action == "*") {
+                                for (const auto& act : pomdp.actions) pomdp.rewards[start_state][act + ":" + pomdp.states[j]] = val;
+                            } else {
+                                pomdp.rewards[start_state][action + ":" + pomdp.states[j]] = val;
                             }
                         }
                         for (uint64_t i = 1; i < pomdp.states.size(); i++) {
@@ -790,12 +735,10 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
                                 std::string token;
                                 rowStream >> token;
                                 ValueType val = convertToValueType<ValueType>(token);
-                                if (val != storm::utility::zero<ValueType>()) {
-                                    if (action == "*") {
-                                        for (const auto& act : pomdp.actions) pomdp.rewards[start_state][act + ":" + pomdp.states[j]] = val;
-                                    } else {
-                                        pomdp.rewards[start_state][action + ":" + pomdp.states[j]] = val;
-                                    }
+                                if (action == "*") {
+                                    for (const auto& act : pomdp.actions) pomdp.rewards[start_state][act + ":" + pomdp.states[j]] = val;
+                                } else {
+                                    pomdp.rewards[start_state][action + ":" + pomdp.states[j]] = val;
                                 }
                             }
                         }
@@ -811,8 +754,6 @@ POMDPcomponents<ValueType> parsePomdpFile(const std::string& filename) {
 template<typename ValueType>
 storm::storage::SparseMatrix<ValueType> buildTransitionMatrix(const std::unordered_map<std::string, std::unordered_map<std::string, ValueType>>& newTransitions,
                                                               const std::vector<std::string>& newStates, const std::vector<std::string>& actions) {
-    STORM_PRINT("Building transition matrix");
-
     uint64_t numChoices = 0;
     for (const auto& state : newStates) {
         if (state == "initial")
@@ -887,16 +828,12 @@ storm::storage::SparseMatrix<ValueType> buildTransitionMatrix(const std::unorder
             }
         }
     }
-
-    STORM_PRINT("Transition matrix built");
     return builder.build();
 }
 
 template<typename ValueType>
 storm::storage::SparseMatrix<ValueType> buildRewardMatrix(const std::unordered_map<std::string, std::unordered_map<std::string, ValueType>>& rewards,
                                                           const std::vector<std::string>& newStates, const std::vector<std::string>& actions) {
-    STORM_PRINT("Building reward matrix");
-
     uint64_t numChoices = 0;
     for (const auto& state : newStates) {
         if (state == "initial")
@@ -972,13 +909,11 @@ storm::storage::SparseMatrix<ValueType> buildRewardMatrix(const std::unordered_m
         }
     }
 
-    STORM_PRINT("Reward matrix built");
     return builder.build();
 }
 
 template<typename ValueType>
 std::unordered_map<std::string, std::unordered_map<std::string, ValueType>> createNewTransitions(POMDPcomponents<ValueType>& pomdp) {
-    STORM_PRINT("Creating new observation-based transitions");
     pomdp.newTransitions.clear();
     std::unordered_set<std::string> newStatesSet;
 
@@ -987,7 +922,6 @@ std::unordered_map<std::string, std::unordered_map<std::string, ValueType>> crea
 
         auto obsProbIt = pomdp.observations_prob.find(action);
         if (obsProbIt == pomdp.observations_prob.end()) {
-            STORM_PRINT("No observation probabilities for action: " + action + "\n");
             continue;
         }
         const auto& obsProbMap = obsProbIt->second;
@@ -1011,7 +945,6 @@ std::unordered_map<std::string, std::unordered_map<std::string, ValueType>> crea
                     if (newProb > storm::utility::zero<ValueType>()) {
                         std::string newKey = action + ":" + baseDest + ":" + observation;
                         pomdp.newTransitions[baseSource][newKey] += newProb;
-                        STORM_PRINT("Added new transition: " + baseSource + " -> " + newKey + " with probability \n");
                         newStatesSet.insert(baseDest + ":" + observation);
                     }
                 }
@@ -1021,7 +954,6 @@ std::unordered_map<std::string, std::unordered_map<std::string, ValueType>> crea
 
     for (const auto& state : newStatesSet) {
         pomdp.newStates.push_back(state);
-        STORM_PRINT("Added new state: " + state + "\n");
     }
 
     return pomdp.newTransitions;
@@ -1048,7 +980,6 @@ void calculateStartProbabilities(POMDPcomponents<ValueType>& pomdp) {
         }
 
         if (activeStates == 0) {
-            STORM_PRINT("Warning: No states eligible as start states. Defaulting to uniform distribution.\n");
             pomdp.start_probabilities.resize(numStates);
             ValueType uniformProb = storm::utility::one<ValueType>() / static_cast<ValueType>(numStates);
             std::fill(pomdp.start_probabilities.begin(), pomdp.start_probabilities.end(), uniformProb);
@@ -1070,7 +1001,6 @@ void addInitialStateTransitions(POMDPcomponents<ValueType>& pomdp_component) {
     const std::string action = "start";
 
     if (pomdp_component.start_probabilities.size() != pomdp_component.states.size()) {
-        STORM_PRINT("Error: start_probabilities and states vectors must be of the same size.\n");
         return;
     }
 
@@ -1091,8 +1021,6 @@ void addInitialStateTransitions(POMDPcomponents<ValueType>& pomdp_component) {
 
 template<typename ValueType>
 void expandNewStatesTransitions(POMDPcomponents<ValueType>& pomdp_components) {
-    STORM_PRINT("Expanding transitions to observation-based new states\n");
-
     std::unordered_map<std::string, std::unordered_map<std::string, ValueType>> expandedTransitions;
 
     for (const auto& entry : pomdp_components.newTransitions) {
@@ -1101,28 +1029,23 @@ void expandNewStatesTransitions(POMDPcomponents<ValueType>& pomdp_components) {
 
         if (startState == "initial") {
             for (const auto& t : transitionsForState) {
-                STORM_PRINT("Adding transition: " + startState + " -> " + t.first + " with probability \n");
                 expandedTransitions[startState][t.first] += t.second;
             }
         } else if (startState.find(':') != std::string::npos) {
             for (const auto& t : transitionsForState) {
-                STORM_PRINT("Adding transition: " + startState + " -> " + t.first + " with probability \n");
                 expandedTransitions[startState][t.first] += t.second;
             }
         } else {
             for (const auto& obsState : pomdp_components.newStates) {
-                STORM_PRINT("Checking if " + obsState + " is a variant of " + startState + "\n");
                 if (obsState.size() > startState.size() && obsState.compare(0, startState.size(), startState) == 0 && obsState[startState.size()] == ':') {
-                    STORM_PRINT("Found variant: " + obsState + "\n");
                     for (const auto& t : transitionsForState) {
-                        STORM_PRINT("Adding transition: " + obsState + " -> " + t.first + " with probability \n");
                         expandedTransitions[obsState][t.first] += t.second;
                     }
                 }
             }
         }
     }
-
+    pomdp_components.transitions.clear();
     pomdp_components.newTransitions = std::move(expandedTransitions);
 }
 
@@ -1135,8 +1058,6 @@ void filterDuplicateEntries(std::unordered_map<std::string, std::unordered_map<s
         for (const auto& [actionEndState, probability] : actionMap) {
             if (filteredActionMap.find(actionEndState) == filteredActionMap.end()) {
                 filteredActionMap[actionEndState] = probability;
-            } else {
-                STORM_PRINT("Duplicate entry removed: " + startState + " -> " + actionEndState + " (Probability: )\n");
             }
         }
 
@@ -1161,8 +1082,6 @@ std::vector<std::string> getObservationVariantsForBase(const POMDPcomponents<Val
 
 template<typename ValueType>
 void expandObservationBasedRewards(POMDPcomponents<ValueType>& pomdp) {
-    STORM_PRINT("Expanding observation-based rewards");
-
     std::unordered_set<std::string> newStatesSet(pomdp.newStates.begin(), pomdp.newStates.end());
 
     std::unordered_map<std::string, std::unordered_map<std::string, ValueType>> newRewards;
@@ -1178,7 +1097,6 @@ void expandObservationBasedRewards(POMDPcomponents<ValueType>& pomdp) {
             startStates = getObservationVariantsForBase(pomdp, startKey);
         }
         if (startStates.empty()) {
-            STORM_PRINT("No observation variants found for start state: " + startKey + ". Skipping rewards for this key.");
             continue;
         }
 
@@ -1198,38 +1116,32 @@ void expandObservationBasedRewards(POMDPcomponents<ValueType>& pomdp) {
                 targetStates = getObservationVariantsForBase(pomdp, targetKey);
             }
             if (targetStates.empty()) {
-                STORM_PRINT("No observation variants found for target state: " + targetKey + ". Skipping reward key: " + rewardKey + "\n");
                 continue;
             }
 
             for (const auto& obsStart : startStates) {
                 if (newStatesSet.find(obsStart) == newStatesSet.end()) {
-                    STORM_PRINT("Skipping start state " + obsStart + " as it is not in newStatesSet.\n");
                     continue;
                 }
                 // Check if there is any transition from this observation-based start.
                 if (pomdp.newTransitions.find(obsStart) == pomdp.newTransitions.end()) {
-                    STORM_PRINT("No transitions from start state: " + obsStart + "\n");
                     continue;
                 }
                 const auto& transMap = pomdp.newTransitions.at(obsStart);
                 for (const auto& obsTarget : targetStates) {
                     if (newStatesSet.find(obsTarget) == newStatesSet.end()) {
-                        STORM_PRINT("Skipping target state " + obsTarget + " as it is not in newStatesSet.\n");
                         continue;
                     }
                     std::string transKey = actionPart + ":" + obsTarget;
                     if (transMap.find(transKey) != transMap.end()) {
                         newRewards[obsStart][transKey] = rewardEntry.second;
-                        STORM_PRINT("Created reward for key: " + transKey + " under start state: " + obsStart + "\n");
-                    } else {
-                        STORM_PRINT("No corresponding transition found for reward key: " + transKey + " under start state: " + obsStart + "\n");
                     }
                 }
             }
         }
     }
-
+    pomdp.rewards.clear();
+    pomdp.newTransitions.clear();
     pomdp.newRewards = newRewards;
 }
 
@@ -1258,6 +1170,7 @@ PomdpSolveParserResult<ValueType> PomdpSolveParser<ValueType>::parsePomdpSolveFi
     expandObservationBasedRewards(pomdp);
 
     auto rewardMatrix = buildRewardMatrix<ValueType>(pomdp.newRewards, pomdp.newStates, pomdp.actions);
+    pomdp.newRewards.clear();
 
     std::optional<storm::storage::SparseMatrix<ValueType>> optRewardMatrix = std::make_optional(rewardMatrix);
     std::optional<std::vector<ValueType>> optStateRewardVec = std::nullopt;
@@ -1298,9 +1211,8 @@ PomdpSolveParserResult<ValueType> PomdpSolveParser<ValueType>::parsePomdpSolveFi
     std::string outputFilePath = "/home/kaloyank/storm/kaloyanFork/storm/resources/examples/testfiles/parser/example.pomdp.dot";
     auto modelPtr = new_pomdp->template as<storm::models::sparse::Model<ValueType>>();
     storm::api::exportSparseModelAsDot(modelPtr, outputFilePath);
-
+    
     ValueType discountFactor = static_cast<ValueType>(pomdp.discount);
-    STORM_PRINT("End of parser!!!\n");
     PomdpSolveParserResult<ValueType> result;
     new_pomdp->setIsCanonic();
     result.pomdp = new_pomdp;
