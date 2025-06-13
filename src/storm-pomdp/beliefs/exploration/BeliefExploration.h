@@ -42,11 +42,6 @@ class BeliefExploration {
                            TerminationCallback const& terminationCallback = {}, storm::OptionalRef<std::string const> rewardModelName = {},
                            storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction = {});
 
-    void resumeRewardAwareExploration(RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info,
-                                      TerminalBeliefCallback const& terminalBeliefCallback, TerminationCallback const& terminationCallback,
-                                      RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpType, BeliefType> rewardSplitter,
-                                      storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction);
-
    private:
     template<typename InfoType, typename NextStateHandleType>
     bool performExploration(InfoType& info, NextStateHandleType&& exploreNextStates, TerminalBeliefCallback const& terminalBeliefCallback,

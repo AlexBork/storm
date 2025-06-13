@@ -4,8 +4,6 @@
 #include "storm-pomdp-cli/settings/modules/POMDPSettings.h"
 #include "storm-pomdp-cli/settings/modules/QualitativePOMDPAnalysisSettings.h"
 #include "storm-pomdp-cli/settings/modules/ToParametricSettings.h"
-#include "storm/settings/modules/DebugSettings.h"
-#include "storm/settings/modules/GeneralSettings.h"
 
 #include "storm-pomdp-cli/settings/PomdpSettings.h"
 #include "storm/analysis/GraphConditions.h"
@@ -343,17 +341,6 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     if (rewardModelName) {
         propertyInfo.kind = storm::pomdp::beliefs::PropertyInformation::Kind::ExpectedTotalReachabilityReward;
         propertyInfo.rewardModelName = rewardModelName;
-    } else if (formulaInfo.isBounded()) {
-        propertyInfo.kind = storm::pomdp::beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability;
-        // Collect reward bounds from bounded formula
-        auto boundedFormula = formula.asProbabilityOperatorFormula().getSubformula().asBoundedUntilFormula();
-        for (uint64_t i = 0; i < boundedFormula.getDimension(); ++i) {
-            const auto& tbRef = boundedFormula.getTimeBoundReference(i);
-            if (tbRef.isRewardBound()) {
-                propertyInfo.rewardBounds.push_back(
-                    {tbRef.getRewardName(), boundedFormula.getLowerBoundAsOptionalTimeBound(i), boundedFormula.getUpperBoundAsOptionalTimeBound(i)});
-            }
-        }
     } else {
         propertyInfo.kind = storm::pomdp::beliefs::PropertyInformation::Kind::ReachabilityProbability;
     }
@@ -373,19 +360,8 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
         } else {
             revisedOptions.maxExplorationSize = belExplSettings.getSizeThresholdInit();
         }
-
-        if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
-            std::vector<std::string> relevantRewardModelNames(propertyInfo.rewardBounds.size());
-            for (auto const& rewardBound : propertyInfo.rewardBounds) {
-                relevantRewardModelNames.push_back(rewardBound.rewardModelName);
-            }
-            std::tie(resultValue, completedExploration) =
-                checker.checkRewardAwareDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
-                                                   belExplSettings.isDynamicTriangulationModeSet(), precomputedPomdpValueBounds, relevantRewardModelNames);
-        } else {
-            std::tie(resultValue, completedExploration) = checker.checkDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
-                                                                                  belExplSettings.isDynamicTriangulationModeSet(), precomputedPomdpValueBounds);
-        }
+        std::tie(resultValue, completedExploration) = checker.checkDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
+                                                                              belExplSettings.isDynamicTriangulationModeSet(), precomputedPomdpValueBounds);
     }
 
     if (pomdpSettings.isBeliefExplorationUnfoldSet()) {
@@ -396,16 +372,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             revisedOptions.maxExplorationSize = belExplSettings.getSizeThresholdInit();
         }
         isUnderApproximation = true;
-        if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
-            std::vector<std::string> relevantRewardModelNames(propertyInfo.rewardBounds.size());
-            for (auto const& rewardBound : propertyInfo.rewardBounds) {
-                relevantRewardModelNames.push_back(rewardBound.rewardModelName);
-            }
-            std::tie(resultValue, completedExploration) =
-                checker.checkRewardAwareUnfold(env, propertyInfo, revisedOptions, precomputedPomdpValueBounds, relevantRewardModelNames);
-        } else {
-            std::tie(resultValue, completedExploration) = checker.checkUnfold(env, propertyInfo, revisedOptions, precomputedPomdpValueBounds);
-        }
+        std::tie(resultValue, completedExploration) = checker.checkUnfold(env, propertyInfo, revisedOptions, precomputedPomdpValueBounds);
         isOverApproximation = completedExploration;
     }
     if (storm::solver::maximize(propertyInfo.dir) ? isOverApproximation : isUnderApproximation) {

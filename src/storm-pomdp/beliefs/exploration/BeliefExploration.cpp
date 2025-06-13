@@ -83,22 +83,6 @@ struct StandardDiscoverCallback {
 };
 
 template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
-struct RewardAwareDiscoverCallback {
-    RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info;
-
-    RewardAwareDiscoverCallback(RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info) : info(info) {
-        // Intentionally left empty
-    }
-    void operator()(BeliefType&& bel, typename BeliefType::ValueType&& val, std::vector<BeliefMdpValueType> const& rewards) {
-        auto const belId = info.discoveredBeliefs.getIdOrAddBelief(std::move(bel));
-        if (info.exploredBeliefs.count(belId) == 0u && info.terminalBeliefValues.count(belId) == 0u) {
-            info.queue.push(belId);
-        }
-        info.matrix.transitions.push_back({storm::utility::convertNumber<BeliefMdpValueType>(val), belId, rewards});
-    }
-};
-
-template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
 BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::BeliefExploration(PomdpType const& pomdp) : firstStateNextStateGenerator(pomdp) {
     // Intentionally left empty.
 }
@@ -117,21 +101,6 @@ void BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::resumeExplora
                            terminationCallback);
     } else {
         performExploration(info, firstStateNextStateGenerator.getHandle(discoverCallback), terminalBeliefCallback, terminationCallback);
-    }
-}
-
-template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
-void BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::resumeRewardAwareExploration(
-    RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info, TerminalBeliefCallback const& terminalBeliefCallback,
-    TerminationCallback const& terminationCallback, RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpType, BeliefType> rewardSplitter,
-    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction) {
-    RewardAwareDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
-    if (abstraction) {
-        performExploration(info, firstStateNextStateGenerator.getPrePostAbstractionHandle(rewardSplitter, abstraction.value(), discoverCallback),
-                           terminalBeliefCallback, terminationCallback);
-    } else {
-        performExploration(info, firstStateNextStateGenerator.getPreAbstractionHandle(rewardSplitter, discoverCallback), terminalBeliefCallback,
-                           terminationCallback);
     }
 }
 
