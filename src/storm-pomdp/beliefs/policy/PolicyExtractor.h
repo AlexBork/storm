@@ -1,5 +1,5 @@
 #pragma once
-#include "../../../../build-release-m1/include/storm-pomdp/beliefs/storage/Belief.h"
+#include "storm-pomdp/beliefs/storage/Belief.h"
 #include "ObservationBasedFiniteStateController.h"
 
 namespace storm {

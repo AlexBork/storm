@@ -523,50 +523,51 @@ void BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefM
                 }
                 newLabeling.addLabel("external_value");
 
-            auto transMatrix = scheduledModel->getTransitionMatrix();
-            for (uint64_t i = 0; i < scheduledModel->getNumberOfStates(); ++i) {
-                if (newLabeling.getStateHasLabel("truncated", i)) {
-                    uint64_t localChosenActionIndex = underApproximation->getSchedulerForExploredMdp()->getChoice(i).getDeterministicChoice();
-                    auto rowIndex = scheduledModel->getTransitionMatrix().getRowGroupIndices()[i];
-                    if (scheduledModel->getChoiceLabeling().getLabelsOfChoice(rowIndex + localChosenActionIndex).size() > 0) {
-                        auto label = *(scheduledModel->getChoiceLabeling().getLabelsOfChoice(rowIndex + localChosenActionIndex).begin());
-                        if (label.rfind("clip", 0) == 0) {
-                            newLabeling.addLabelToState("clipping", i);
-                            auto chosenRow = transMatrix.getRow(i, 0);
-                            auto candidateIndex = (chosenRow.end() - 1)->getColumn();
-                            transMatrix.makeRowDirac(transMatrix.getRowGroupIndices()[i], candidateIndex);
-                        } else if (label.rfind("mem_node", 0) == 0) {
-                            if (!newLabeling.containsLabel("finite_mem_" + label.substr(9, 1))) {
-                                newLabeling.addLabel("finite_mem_" + label.substr(9, 1));
+                auto transMatrix = scheduledModel->getTransitionMatrix();
+                for (uint64_t i = 0; i < scheduledModel->getNumberOfStates(); ++i) {
+                    if (newLabeling.getStateHasLabel("truncated", i)) {
+                        uint64_t localChosenActionIndex = underApproximation->getSchedulerForExploredMdp()->getChoice(i).getDeterministicChoice();
+                        auto rowIndex = scheduledModel->getTransitionMatrix().getRowGroupIndices()[i];
+                        if (scheduledModel->getChoiceLabeling().getLabelsOfChoice(rowIndex + localChosenActionIndex).size() > 0) {
+                            auto label = *(scheduledModel->getChoiceLabeling().getLabelsOfChoice(rowIndex + localChosenActionIndex).begin());
+                            if (label.rfind("clip", 0) == 0) {
+                                newLabeling.addLabelToState("clipping", i);
+                                auto chosenRow = transMatrix.getRow(i, 0);
+                                auto candidateIndex = (chosenRow.end() - 1)->getColumn();
+                                transMatrix.makeRowDirac(transMatrix.getRowGroupIndices()[i], candidateIndex);
+                            } else if (label.rfind("mem_node", 0) == 0) {
+                                if (!newLabeling.containsLabel("finite_mem_" + label.substr(9, 1))) {
+                                    newLabeling.addLabel("finite_mem_" + label.substr(9, 1));
+                                }
+                                newLabeling.addLabelToState("finite_mem_" + label.substr(9, 1), i);
+                                newLabeling.addLabelToState("cutoff", i);
+                            } else {
+                                newLabeling.addLabelToState(label, i);
+                                newLabeling.addLabelToState("cutoff", i);
                             }
-                            newLabeling.addLabelToState("finite_mem_" + label.substr(9, 1), i);
-                            newLabeling.addLabelToState("cutoff", i);
-                        } else {
-                            newLabeling.addLabelToState(label, i);
-                            newLabeling.addLabelToState("cutoff", i);
                         }
                     }
                 }
-            }
-            newLabeling.removeLabel("truncated");
+                newLabeling.removeLabel("truncated");
 
-            transMatrix.dropZeroEntries();
-            storm::storage::sparse::ModelComponents<ValueType> modelComponents(transMatrix, newLabeling);
-            if (scheduledModel->hasChoiceLabeling()) {
-                modelComponents.choiceLabeling = scheduledModel->getChoiceLabeling();
+                transMatrix.dropZeroEntries();
+                storm::storage::sparse::ModelComponents<ValueType> modelComponents(transMatrix, newLabeling);
+                if (scheduledModel->hasChoiceLabeling()) {
+                    modelComponents.choiceLabeling = scheduledModel->getChoiceLabeling();
+                }
+                storm::models::sparse::Mdp<ValueType> newMDP(modelComponents);
+                auto inducedMC = newMDP.applyScheduler(*(underApproximation->getSchedulerForExploredMdp()), true);
+                scheduledModel = std::static_pointer_cast<storm::models::sparse::Model<ValueType>>(inducedMC);
+            } else {
+                auto inducedMC = underApproximation->getExploredMdp()->applyScheduler(*(underApproximation->getSchedulerForExploredMdp()), true);
+                scheduledModel = std::static_pointer_cast<storm::models::sparse::Model<ValueType>>(inducedMC);
             }
-            storm::models::sparse::Mdp<ValueType> newMDP(modelComponents);
-            auto inducedMC = newMDP.applyScheduler(*(underApproximation->getSchedulerForExploredMdp()), true);
-            scheduledModel = std::static_pointer_cast<storm::models::sparse::Model<ValueType>>(inducedMC);
-        } else {
-            auto inducedMC = underApproximation->getExploredMdp()->applyScheduler(*(underApproximation->getSchedulerForExploredMdp()), true);
-            scheduledModel = std::static_pointer_cast<storm::models::sparse::Model<ValueType>>(inducedMC);
-        }
-        result.schedulerAsMarkovChain = scheduledModel;
-        if (min) {
-            result.cutoffSchedulers = underApproximation->getUpperValueBoundSchedulers();
-        } else {
-            result.cutoffSchedulers = underApproximation->getLowerValueBoundSchedulers();
+            result.schedulerAsMarkovChain = scheduledModel;
+            if (min) {
+                result.cutoffSchedulers = underApproximation->getUpperValueBoundSchedulers();
+            } else {
+                result.cutoffSchedulers = underApproximation->getLowerValueBoundSchedulers();
+            }
         }
     }
 }
@@ -1195,8 +1196,7 @@ bool BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefM
                     }
                 }
                 setUnfoldingToWait();
-                while (unfoldingControl == UnfoldingControl::WaitForCutoffValues)
-                    ;
+                while (unfoldingControl == UnfoldingControl::WaitForCutoffValues);
                 pauseUnfolding();
             }
         }
@@ -1793,5 +1793,6 @@ template class BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<s
 template class BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>>;
 
 }  // namespace modelchecker
+// namespace modelchecker
 }  // namespace pomdp
 }  // namespace storm
