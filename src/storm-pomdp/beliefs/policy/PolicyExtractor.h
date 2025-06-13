@@ -1,6 +1,6 @@
 #pragma once
-#include "storm-pomdp/beliefs/storage/Belief.h"
 #include "ObservationBasedFiniteStateController.h"
+#include "storm-pomdp/beliefs/storage/Belief.h"
 
 namespace storm {
 namespace models::sparse {
