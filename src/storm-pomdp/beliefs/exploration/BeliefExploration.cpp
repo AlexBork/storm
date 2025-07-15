@@ -84,7 +84,6 @@ BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::BeliefExploration(
 
 template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
 
-
 template class BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<double>>;
 template class BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>;
 template class BeliefExploration<storm::RationalNumber, storm::models::sparse::Pomdp<storm::RationalNumber>, Belief<double>>;
