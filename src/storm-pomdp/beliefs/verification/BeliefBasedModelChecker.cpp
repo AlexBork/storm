@@ -4,7 +4,6 @@
 #include <storm/api/export.h>
 
 #include "storm-pomdp/beliefs/abstraction/FreudenthalTriangulationBeliefAbstraction.h"
-#include "storm-pomdp/beliefs/abstraction/RewardBoundedBeliefSplitter.h"
 #include "storm-pomdp/beliefs/exploration/BeliefExploration.h"
 #include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
@@ -12,7 +11,6 @@
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelCheckerOptions.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/api/verification.h"
-#include "storm/modelchecker/results/ExplicitQuantitativeCheckResult.h"
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/utility/OptionalRef.h"
 #include "storm/utility/Stopwatch.h"
@@ -37,15 +35,17 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
                 return [&info, maxSize = options.maxExplorationSize.value()]() { return info.discoveredBeliefs.getNumberOfBeliefIds() > maxSize; };
             }
         case MAX_EXPLORATION_TIME:
-            return [&swExplore, maxDuration = options.maxExplorationTime.value()]() { return (unsigned)abs(swExplore.getTimeInSeconds()) > maxDuration; };
+            return [&swExplore, maxDuration = options.maxExplorationTime.value()]() {
+                return static_cast<unsigned>(abs(swExplore.getTimeInSeconds())) > maxDuration;
+            };
         case MAX_EXPLORATION_SIZE_AND_TIME:
             if (options.implicitCutOffs) {
                 return [&info, &swExplore, maxSize = options.maxExplorationSize.value(), maxDuration = options.maxExplorationTime.value()]() {
-                    return info.exploredBeliefs.size() > maxSize || (unsigned)abs(swExplore.getTimeInSeconds()) > maxDuration;
+                    return info.exploredBeliefs.size() > maxSize || static_cast<unsigned>(abs(swExplore.getTimeInSeconds())) > maxDuration;
                 };
             } else {
                 return [&info, &swExplore, maxSize = options.maxExplorationSize.value(), maxDuration = options.maxExplorationTime.value()]() {
-                    return info.discoveredBeliefs.getNumberOfBeliefIds() > maxSize || (unsigned)abs(swExplore.getTimeInSeconds()) > maxDuration;
+                    return info.discoveredBeliefs.getNumberOfBeliefIds() > maxSize || static_cast<unsigned>(abs(swExplore.getTimeInSeconds())) > maxDuration;
                 };
             }
         case NONE:
@@ -66,7 +66,7 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
             // Terminate if the gap is small enough
             return
                 [&propertyInformation, &valueBounds, maxGapToCut = options.maxGapToCut.value()](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
-                    if (propertyInformation.targetObservations.count(belief.observation()) > 0) {
+                    if (propertyInformation.targetObservations.contains(belief.observation())) {
                         return storm::utility::zero<BeliefMdpValueType>();
                     } else {
                         // TODO add scheduler information if requested
@@ -86,7 +86,7 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
                 };
         } else {
             return [&propertyInformation](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
-                if (propertyInformation.targetObservations.count(belief.observation()) > 0) {
+                if (propertyInformation.targetObservations.contains(belief.observation())) {
                     return storm::utility::zero<BeliefMdpValueType>();
                 } else {
                     return std::nullopt;
@@ -96,7 +96,7 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
     } else if (options.maxGapToCut.has_value()) {
         // Terminate if the gap is small enough
         return [&propertyInformation, &valueBounds, maxGapToCut = options.maxGapToCut.value()](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
-            if (propertyInformation.targetObservations.count(belief.observation()) > 0) {
+            if (propertyInformation.targetObservations.contains(belief.observation())) {
                 return storm::utility::one<BeliefMdpValueType>();
             } else {
                 // TODO add scheduler information if requested
@@ -116,7 +116,7 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
         };
     } else {
         return [&propertyInformation](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
-            if (propertyInformation.targetObservations.count(belief.observation()) > 0) {
+            if (propertyInformation.targetObservations.contains(belief.observation())) {
                 return storm::utility::one<BeliefMdpValueType>();
             } else {
                 return std::nullopt;
@@ -164,13 +164,13 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpFr
     }
 }
 
-template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType,
+template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType, typename AbstractionType,
          typename InfoType = StandardExplorationInformation<BeliefMdpValueType, BeliefType>>
 std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment const& env, PomdpModelType const& pomdp,
                                                             PropertyInformation const& propertyInformation,
                                                             storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
                                                             storm::pomdp::storage::PreprocessingPomdpValueBounds<BeliefMdpValueType> const& valueBounds,
-                                                            storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction = {}) {
+                                                            storm::OptionalRef<AbstractionType> abstraction = {}) {
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::ReachabilityProbability ||
                          propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward,
                      "Unexpected kind of property.");
@@ -240,7 +240,8 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storm::pomdp::storage::PreprocessingPomdpValueBounds<BeliefMdpValueType> const& valueBounds) {
-    return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(env, inputPomdp, propertyInformation, options, valueBounds);
+    return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType, NoAbstractionType>(env, inputPomdp, propertyInformation,
+                                                                                                                   options, valueBounds);
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
@@ -251,7 +252,7 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
     auto mode = useDynamic ? FreudenthalTriangulationMode::Dynamic : FreudenthalTriangulationMode::Static;
     FreudenthalTriangulationBeliefAbstraction<Belief<BeliefValueType>> abstraction(storm::utility::convertNumber<BeliefValueType>(resolution), mode);
     return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(env, inputPomdp, propertyInformation, options, valueBounds,
-                                                                                                abstraction);
+                                                                                                storm::OptionalRef(abstraction));
 }
 
 // TODO: Check which instantiations are actually necessary / reasonable.

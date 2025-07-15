@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "storm-pomdp/beliefs/abstraction/NoAbstraction.h"
+#include "storm-pomdp/beliefs/abstraction/FreudenthalTriangulationBeliefAbstraction.h"
+
 #include "storm-pomdp/beliefs/storage/BeliefBuilder.h"
 #include "storm-pomdp/beliefs/utility/types.h"
 

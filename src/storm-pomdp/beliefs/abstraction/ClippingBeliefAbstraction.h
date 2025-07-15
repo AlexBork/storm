@@ -31,7 +31,7 @@ class ClippingBeliefAbstraction {
     ClippingBeliefAbstraction(std::vector<uint64_t>&& observationResolutions);
 
     template<typename AbstractCallback>
-    void abstract(BeliefValueType&& probabilityFactor, BeliefType&& belief, AbstractCallback const& callback) {
+    void abstract(BeliefType&& belief, BeliefValueType&& probabilityFactor, AbstractCallback const& callback) {
         BeliefClipping clipping = clipBeliefToGrid(belief, observationResolutions[belief.observation()]);
         if (clipping.isClippable) {
             BeliefValueType a = (storm::utility::one<BeliefValueType>() - clipping.delta) * probabilityFactor;

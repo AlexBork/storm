@@ -18,9 +18,6 @@ template<typename BeliefType>
 class FreudenthalTriangulationBeliefAbstraction;
 
 template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
-class RewardBoundedBeliefSplitter;
-
-template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
 class BeliefExploration {
    public:
     using TerminationCallback = std::function<bool()>;
@@ -38,9 +35,21 @@ class BeliefExploration {
         return info;
     }
 
-    void resumeExploration(StandardExplorationInformation<BeliefMdpValueType, BeliefType>& info, TerminalBeliefCallback const& terminalBeliefCallback = {},
-                           TerminationCallback const& terminationCallback = {}, storm::OptionalRef<std::string const> rewardModelName = {},
-                           storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction = {});
+    template<typename AbstractionType>
+    void resumeExploration(StandardExplorationInformation<BeliefMdpValueType, BeliefType>& info, TerminalBeliefCallback const& terminalBeliefCallback,
+                           TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName,
+                           storm::OptionalRef<AbstractionType> abstraction) {
+        if (rewardModelName.has_value()) {
+            firstStateNextStateGenerator.setRewardModel(rewardModelName.value());
+        }
+        StandardDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
+        if (abstraction) {
+            performExploration(info, firstStateNextStateGenerator.getPostAbstractionHandle(abstraction.value(), discoverCallback), terminalBeliefCallback,
+                               terminationCallback);
+        } else {
+            performExploration(info, firstStateNextStateGenerator.getHandle(discoverCallback), terminalBeliefCallback, terminationCallback);
+        }
+    }
 
    private:
     template<typename InfoType, typename NextStateHandleType>

@@ -8,6 +8,10 @@ struct BeliefBasedModelCheckerOptions {
     bool implicitCutOffs = false;
     bool buildChoiceLabeling = true;
     bool generatePolicy = true;
+    bool useClipping = false;
+
+    // Clipping abstraction parameters
+    std::optional<std::vector<uint64_t>> clippingResolutions;
 
     // Termination criteria
     std::optional<uint64_t> maxExplorationSize = std::nullopt;

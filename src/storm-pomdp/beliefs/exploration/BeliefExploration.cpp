@@ -2,13 +2,8 @@
 
 #include "storm-pomdp/beliefs/exploration/BeliefExplorationMatrix.h"
 #include "storm-pomdp/beliefs/exploration/BeliefExplorationMode.h"
-#include "storm-pomdp/beliefs/exploration/ExplorationQueue.h"
 
-#include "storm-pomdp/beliefs/abstraction/FreudenthalTriangulationBeliefAbstraction.h"
-#include "storm-pomdp/beliefs/abstraction/RewardBoundedBeliefSplitter.h"
-#include "storm-pomdp/beliefs/exploration/FirstStateNextStateGenerator.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
-#include "storm-pomdp/beliefs/utility/types.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/utility/OptionalRef.h"
@@ -88,24 +83,26 @@ BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::BeliefExploration(
 }
 
 template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
-void BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::resumeExploration(
-    StandardExplorationInformation<BeliefMdpValueType, BeliefType>& info, TerminalBeliefCallback const& terminalBeliefCallback,
-    TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName,
-    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction) {
-    if (rewardModelName.has_value()) {
-        firstStateNextStateGenerator.setRewardModel(rewardModelName.value());
-    }
-    StandardDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
-    if (abstraction) {
-        performExploration(info, firstStateNextStateGenerator.getPostAbstractionHandle(abstraction.value(), discoverCallback), terminalBeliefCallback,
-                           terminationCallback);
-    } else {
-        performExploration(info, firstStateNextStateGenerator.getHandle(discoverCallback), terminalBeliefCallback, terminationCallback);
-    }
-}
+
 
 template class BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<double>>;
 template class BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>;
 template class BeliefExploration<storm::RationalNumber, storm::models::sparse::Pomdp<storm::RationalNumber>, Belief<double>>;
 template class BeliefExploration<storm::RationalNumber, storm::models::sparse::Pomdp<storm::RationalNumber>, Belief<storm::RationalNumber>>;
+
+template void BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<double>>::resumeExploration(
+    StandardExplorationInformation<double, Belief<double>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
+    TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName, storm::OptionalRef<NoAbstractionType> abstraction);
+template void BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<double>>::resumeExploration(
+    StandardExplorationInformation<double, Belief<double>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
+    TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName,
+    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<Belief<double>>> abstraction);
+
+template void BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>::resumeExploration(
+    StandardExplorationInformation<double, Belief<storm::RationalNumber>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
+    TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName, storm::OptionalRef<NoAbstractionType> abstraction);
+template void BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>::resumeExploration(
+    StandardExplorationInformation<double, Belief<storm::RationalNumber>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
+    TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName,
+    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<Belief<double>>> abstraction);
 }  // namespace storm::pomdp::beliefs
