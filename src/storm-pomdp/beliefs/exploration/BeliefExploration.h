@@ -18,6 +18,22 @@ template<typename BeliefType>
 class FreudenthalTriangulationBeliefAbstraction;
 
 template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
+struct StandardDiscoverCallback {
+    StandardExplorationInformation<BeliefMdpValueType, BeliefType>& info;
+
+    StandardDiscoverCallback(StandardExplorationInformation<BeliefMdpValueType, BeliefType>& info) : info(info) {
+        // Intentionally left empty
+    }
+    void operator()(BeliefType&& bel, typename BeliefType::ValueType&& val) {
+        auto const belId = info.discoveredBeliefs.getIdOrAddBelief(std::move(bel));
+        if (info.exploredBeliefs.count(belId) == 0u && info.terminalBeliefValues.count(belId) == 0u) {
+            info.queue.push(belId);
+        }
+        info.matrix.transitions.push_back({storm::utility::convertNumber<BeliefMdpValueType>(val), belId});
+    }
+};
+
+template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
 class BeliefExploration {
    public:
     using TerminationCallback = std::function<bool()>;

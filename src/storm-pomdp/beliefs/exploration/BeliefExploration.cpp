@@ -62,27 +62,9 @@ bool BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::performExplor
 }
 
 template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
-struct StandardDiscoverCallback {
-    StandardExplorationInformation<BeliefMdpValueType, BeliefType>& info;
-
-    StandardDiscoverCallback(StandardExplorationInformation<BeliefMdpValueType, BeliefType>& info) : info(info) {
-        // Intentionally left empty
-    }
-    void operator()(BeliefType&& bel, typename BeliefType::ValueType&& val) {
-        auto const belId = info.discoveredBeliefs.getIdOrAddBelief(std::move(bel));
-        if (info.exploredBeliefs.count(belId) == 0u && info.terminalBeliefValues.count(belId) == 0u) {
-            info.queue.push(belId);
-        }
-        info.matrix.transitions.push_back({storm::utility::convertNumber<BeliefMdpValueType>(val), belId});
-    }
-};
-
-template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
 BeliefExploration<BeliefMdpValueType, PomdpType, BeliefType>::BeliefExploration(PomdpType const& pomdp) : firstStateNextStateGenerator(pomdp) {
     // Intentionally left empty.
 }
-
-template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
 
 template class BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<double>>;
 template class BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>;

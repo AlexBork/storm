@@ -1,4 +1,3 @@
-#include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
 #include "storm-pomdp/builder/BeliefMdpExplorer.h"
 #include "storm-pomdp/modelchecker/BeliefExplorationPomdpModelCheckerOptions.h"
 #include "storm-pomdp/storage/BeliefManager.h"

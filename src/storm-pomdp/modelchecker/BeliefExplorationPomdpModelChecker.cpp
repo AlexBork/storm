@@ -4,14 +4,12 @@
 
 #include "storm-pomdp/analysis/FiniteBeliefMdpDetection.h"
 #include "storm-pomdp/analysis/FormulaInformation.h"
-#include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
 #include "storm-pomdp/transformer/MakeStateSetObservationClosed.h"
 
 #include "storm/logic/Formulas.h"
 #include "storm/utility/ConstantsComparator.h"
 #include "storm/utility/NumberTraits.h"
 
-#include "storm-pomdp/beliefs/abstraction/FreudenthalTriangulationBeliefAbstraction.h"
 #include "storm-pomdp/builder/BeliefMdpExplorer.h"
 #include "storm-pomdp/modelchecker/PreprocessingPomdpValueBoundsModelChecker.h"
 #include "storm/utility/vector.h"

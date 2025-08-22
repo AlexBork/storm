@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "LpSolverForward.h"
 #include "OptimizationDirection.h"
 
 namespace storm {
