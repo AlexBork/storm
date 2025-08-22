@@ -9,8 +9,7 @@ FormulaInformation::FormulaInformation()
       mContainsCumulativeRewardFormula(false),
       mContainsRewardBoundedFormula(false),
       mContainsLongRunFormula(false),
-      mContainsComplexPathFormula(false),
-      mContainsDiscountFormula(false) {
+      mContainsComplexPathFormula(false) {
     // Intentionally left empty
 }
 
@@ -42,10 +41,6 @@ bool FormulaInformation::containsComplexPathFormula() const {
     return this->mContainsComplexPathFormula;
 }
 
-bool FormulaInformation::containsDiscountFormula() const {
-    return this->mContainsDiscountFormula;
-}
-
 FormulaInformation FormulaInformation::join(FormulaInformation const& other) {
     FormulaInformation result;
     result.mContainsRewardOperator = this->containsRewardOperator() || other.containsRewardOperator();
@@ -55,7 +50,6 @@ FormulaInformation FormulaInformation::join(FormulaInformation const& other) {
     result.mContainsRewardBoundedFormula = this->containsRewardBoundedFormula() || other.containsRewardBoundedFormula();
     result.mContainsLongRunFormula = this->containsLongRunFormula() || other.containsLongRunFormula();
     result.mContainsComplexPathFormula = this->containsComplexPathFormula() || other.containsComplexPathFormula();
-    result.mContainsDiscountFormula = this->containsDiscountFormula() || other.containsDiscountFormula();
     return result;
 }
 
@@ -91,11 +85,6 @@ FormulaInformation& FormulaInformation::setContainsLongRunFormula(bool newValue)
 
 FormulaInformation& FormulaInformation::setContainsComplexPathFormula(bool newValue) {
     this->mContainsComplexPathFormula = newValue;
-    return *this;
-}
-
-FormulaInformation& FormulaInformation::setContainsDiscountFormula(bool newValue) {
-    this->mContainsDiscountFormula = newValue;
     return *this;
 }
 

@@ -75,22 +75,6 @@ void Multiplier<ValueType>::repeatedMultiplyAndReduce(Environment const& env, Op
 }
 
 template<typename ValueType>
-void Multiplier<ValueType>::repeatedMultiplyAndReduceWithFactor(Environment const& env, OptimizationDirection const& dir, std::vector<ValueType>& x,
-                                                                std::vector<ValueType> const* b, uint64_t n, ValueType factor) const {
-    storm::utility::ProgressMeasurement progress("multiplications");
-    progress.setMaxCount(n);
-    progress.startNewMeasurement(0);
-    for (uint64_t i = 0; i < n; ++i) {
-        multiplyAndReduce(env, dir, x, b, x);
-        std::transform(x.begin(), x.end(), x.begin(), [factor](ValueType& c) { return c * factor; });
-        if (storm::utility::resources::isTerminate()) {
-            STORM_LOG_WARN("Aborting after " << i << " of " << n << " multiplications");
-            break;
-        }
-    }
-}
-
-template<typename ValueType>
 
 std::vector<ValueType>& Multiplier<ValueType>::provideCachedVector(uint64_t size) const {
     if (this->cachedVector) {

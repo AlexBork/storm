@@ -169,13 +169,5 @@ boost::any CloneVisitor::visit(HOAPathFormula const& f, boost::any const& data) 
     }
     return std::static_pointer_cast<Formula>(result);
 }
-
-boost::any CloneVisitor::visit(DiscountedCumulativeRewardFormula const& f, boost::any const&) const {
-    return std::static_pointer_cast<Formula>(std::make_shared<DiscountedCumulativeRewardFormula>(f));
-}
-
-boost::any CloneVisitor::visit(DiscountedTotalRewardFormula const& f, boost::any const&) const {
-    return std::static_pointer_cast<Formula>(std::make_shared<DiscountedTotalRewardFormula>(f));
-}
 }  // namespace logic
 }  // namespace storm

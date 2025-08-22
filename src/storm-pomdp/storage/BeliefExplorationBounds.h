@@ -37,13 +37,13 @@ struct PreprocessingPomdpValueBounds {
      * @param state the state ID
      * @return the largest lower bound value
      */
-    ValueType getHighestLowerBound(uint64_t const& state) const;
+    ValueType getHighestLowerBound(uint64_t const& state);
     /**
      * Picks the smallest precomputed upper bound for a given state of the POMDP
      * @param state the state ID
      * @return the smallest upper bound value
      */
-    ValueType getSmallestUpperBound(uint64_t const& state) const;
+    ValueType getSmallestUpperBound(uint64_t const& state);
 };
 
 /**

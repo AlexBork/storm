@@ -197,12 +197,8 @@ std::vector<uint64_t> MakePOMDPCanonic<ValueType>::computeCanonicalPermutation()
                         actionval = *pomdp.getChoiceLabeling().getLabelsOfChoice(rowIndexFrom).begin();
                     }
                 }
-                std::string obsval = "";
-                if (pomdp.hasObservationValuations()) {
-                    obsval = " (" + pomdp.getObservationValuations().getStateInfo(observation) + ") ";
-                }
                 STORM_LOG_THROW(false, storm::exceptions::AmbiguousModelException,
-                                "Observation " << getObservationInformation(observation) << obsval << " sometimes provides multiple actions, but in state "
+                                "Observation " << getObservationInformation(observation) << " sometimes provides multiple actions, but in state "
                                                << getStateInformation(state) << " provides only one action " << actionval << ".");
             }
             oneActionObservations.set(observation);
@@ -212,22 +208,13 @@ std::vector<uint64_t> MakePOMDPCanonic<ValueType>::computeCanonicalPermutation()
         } else {
             if (oneActionObservations.get(observation)) {
                 // We have seen this observation previously with one action. Error!
-                std::string stateval = "";
-                if (pomdp.hasStateValuations()) {
-                    stateval = " (" + pomdp.getStateValuations().getStateInfo(state) + ") ";
-                }
-                std::string actionval = "";
-                if (pomdp.hasChoiceLabeling()) {
-                    for (uint64_t i = rowIndexFrom; i < rowIndexTo; ++i) {
-                        actionval += *pomdp.getChoiceLabeling().getLabelsOfChoice(rowIndexFrom).begin();
-                        if (i != rowIndexTo - 1) {
-                            actionval += " & ";
-                        }
-                    }
-                }
+                //                        std::string actionval= "";
+                //                        if (pomdp.hasChoiceLabeling()) {
+                //                            actionval = *pomdp.getChoiceLabeling().getLabelsOfChoice(rowIndexFrom).begin();
+                //                        }
                 STORM_LOG_THROW(false, storm::exceptions::AmbiguousModelException,
                                 "Observation " << getObservationInformation(observation) << " sometimes provides one action, but in state "
-                                               << getStateInformation(state) << " provides " << rowIndexTo - rowIndexFrom << " actions. (" << actionval << ")");
+                                               << getStateInformation(state) << " provides " << rowIndexTo - rowIndexFrom << " actions.");
             }
             moreActionObservations.set(observation);
         }

@@ -38,8 +38,6 @@ class UnaryPathFormula;
 class UnaryStateFormula;
 class UntilFormula;
 class HOAPathFormula;
-class DiscountedCumulativeRewardFormula;
-class DiscountedTotalRewardFormula;
 }  // namespace logic
 }  // namespace storm
 

@@ -156,7 +156,6 @@ BeliefExplorationSettings::BeliefExplorationSettings() : ModuleSettings(moduleNa
     this->addOption(
         storm::settings::OptionBuilder(moduleName, clippingOption, false, "If this is set, unfolding will use  (grid) clipping instead of cut-offs only.")
             .build());
-
     this->addOption(
         storm::settings::OptionBuilder(moduleName, cutZeroGapOption, false, "Cut beliefs where the gap between over- and underapproximation is 0.").build());
     this->addOption(storm::settings::OptionBuilder(moduleName, stateEliminationCutoffOption, false,

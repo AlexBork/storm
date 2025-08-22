@@ -99,24 +99,6 @@ class BeliefManager {
 
     std::vector<BeliefValueType> computeMatrixBeliefProduct(BeliefId const &beliefId, storm::storage::SparseMatrix<BeliefValueType> &matrix);
 
-    std::unordered_map<StateType, BeliefValueType> getBeliefAsMap(BeliefId const &beliefId);
-
-    struct FreudenthalDiff {
-        FreudenthalDiff(StateType const &dimension, BeliefValueType diff);
-
-        StateType dimension;   // i
-        BeliefValueType diff;  // d[i]
-        bool operator>(FreudenthalDiff const &other) const;
-    };
-
-    struct BeliefHash {
-        std::size_t operator()(const BeliefType &belief) const;
-    };
-
-    struct Belief_equal_to {
-        bool operator()(const BeliefType &lhBelief, const BeliefType &rhBelief) const;
-    };
-
    private:
     std::vector<BeliefValueType> getBeliefAsVector(BeliefId const &beliefId);
 
@@ -126,6 +108,22 @@ class BeliefManager {
 
     template<typename DistributionType>
     void adjustDistribution(DistributionType &distr);
+
+    struct BeliefHash {
+        std::size_t operator()(const BeliefType &belief) const;
+    };
+
+    struct Belief_equal_to {
+        bool operator()(const BeliefType &lhBelief, const BeliefType &rhBelief) const;
+    };
+
+    struct FreudenthalDiff {
+        FreudenthalDiff(StateType const &dimension, BeliefValueType diff);
+
+        StateType dimension;   // i
+        BeliefValueType diff;  // d[i]
+        bool operator>(FreudenthalDiff const &other) const;
+    };
 
     BeliefType const &getBelief(BeliefId const &id) const;
 

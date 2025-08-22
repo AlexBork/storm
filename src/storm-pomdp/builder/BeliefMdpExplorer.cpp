@@ -85,7 +85,6 @@ void BeliefMdpExplorer<PomdpType, BeliefValueType>::startNewExploration(std::opt
     if (extraBottomStateValue) {
         currentMdpState = getCurrentNumberOfMdpStates();
         extraBottomState = currentMdpState;
-        stateToHorizon[currentMdpState] = 0;
         mdpStateToBeliefIdMap.push_back(beliefManager->noId());
         probabilityEstimation.push_back(storm::utility::zero<ValueType>());
         insertValueHints(extraBottomStateValue.value(), extraBottomStateValue.value());
@@ -100,7 +99,6 @@ void BeliefMdpExplorer<PomdpType, BeliefValueType>::startNewExploration(std::opt
     if (extraTargetStateValue) {
         currentMdpState = getCurrentNumberOfMdpStates();
         extraTargetState = currentMdpState;
-        stateToHorizon[currentMdpState] = 0;
         mdpStateToBeliefIdMap.push_back(beliefManager->noId());
         probabilityEstimation.push_back(storm::utility::zero<ValueType>());
         insertValueHints(extraTargetStateValue.value(), extraTargetStateValue.value());
@@ -119,7 +117,6 @@ void BeliefMdpExplorer<PomdpType, BeliefValueType>::startNewExploration(std::opt
 
     // Set up the initial state.
     initialMdpState = getOrAddMdpState(beliefManager->getInitialBelief());
-    stateToHorizon[initialMdpState] = 0;
 }
 
 template<typename PomdpType, typename BeliefValueType>
@@ -163,7 +160,6 @@ void BeliefMdpExplorer<PomdpType, BeliefValueType>::restartExploration() {
 
     // Set up the initial state.
     initialMdpState = getOrAddMdpState(beliefManager->getInitialBelief());
-    stateToHorizon[initialMdpState] = 0;
 }
 
 template<typename PomdpType, typename BeliefValueType>
@@ -243,7 +239,7 @@ template<typename PomdpType, typename BeliefValueType>
 typename BeliefMdpExplorer<PomdpType, BeliefValueType>::BeliefId BeliefMdpExplorer<PomdpType, BeliefValueType>::exploreNextState() {
     STORM_LOG_ASSERT(status == Status::Exploring, "Method call is invalid in current status.");
     // Mark the end of the previously explored row group.
-    if (currentMdpState != noState() && !currentStateHasOldBehavior()) {
+    if (currentMdpState != noState() && mdpStatesToExplorePrioState.rbegin()->second == exploredChoiceIndices.size()) {
         internalAddRowGroupIndex();
     }
 
@@ -321,28 +317,6 @@ bool BeliefMdpExplorer<PomdpType, BeliefValueType>::addTransitionToBelief(uint64
         }
     } else {
         column = getOrAddMdpState(transitionTarget, value);
-        if (stateToHorizon.count(column) == 0) {
-            stateToHorizon[column] = stateToHorizon[currentMdpState] + 1;
-        } else {
-            stateToHorizon[column] = std::min(stateToHorizon.at(column), stateToHorizon[currentMdpState] + 1);
-        }
-
-        if (explHeuristic == ExplorationHeuristic::ExcessUncertainty && mdpStatesToExploreStatePrio.count(column) != 0) {
-            // We check if the value is higher than the current priority and update if necessary
-            typename PomdpType::ValueType newPrio = computeUpperValueBoundAtBelief(getBeliefId(column)) - computeLowerValueBoundAtBelief(getBeliefId(column)) -
-                                                    precision / storm::utility::pow(discountFactor, stateToHorizon[column]);
-            newPrio *= value;
-            //  Erase the state from the "queue" map and re-insert it with the new value
-            auto range = mdpStatesToExplorePrioState.equal_range(mdpStatesToExploreStatePrio[column]);
-            for (auto i = range.first; i != range.second; ++i) {
-                if (i->second == column) {
-                    mdpStatesToExplorePrioState.erase(i);
-                    break;
-                }
-            }
-            mdpStatesToExplorePrioState.emplace(newPrio, column);
-            mdpStatesToExploreStatePrio[column] = newPrio;
-        }
     }
     if (getCurrentMdpState() == exploredChoiceIndices.size()) {
         internalAddRowGroupIndex();
@@ -843,18 +817,21 @@ typename BeliefMdpExplorer<PomdpType, BeliefValueType>::MdpStateType BeliefMdpEx
 template<typename PomdpType, typename BeliefValueType>
 typename BeliefMdpExplorer<PomdpType, BeliefValueType>::MdpStateType BeliefMdpExplorer<PomdpType, BeliefValueType>::getStartOfCurrentRowGroup() const {
     STORM_LOG_ASSERT(status == Status::Exploring, "Method call is invalid in current status.");
+    assert(getCurrentMdpState() < exploredChoiceIndices.size());
     return exploredChoiceIndices.at(getCurrentMdpState());
 }
 
 template<typename PomdpType, typename BeliefValueType>
 uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::getSizeOfCurrentRowGroup() const {
     STORM_LOG_ASSERT(status == Status::Exploring, "Method call is invalid in current status.");
+    assert(getCurrentMdpState() < exploredChoiceIndices.size() - 1);
     return exploredChoiceIndices.at(getCurrentMdpState() + 1) - exploredChoiceIndices.at(getCurrentMdpState());
 }
 
 template<typename PomdpType, typename BeliefValueType>
 uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::getRowGroupSizeOfState(uint64_t state) const {
     STORM_LOG_ASSERT(status == Status::Exploring, "Method call is invalid in current status.");
+    assert(state < exploredChoiceIndices.size());
     if (state < exploredChoiceIndices.size() - 1) {
         return exploredChoiceIndices.at(state + 1) - exploredChoiceIndices.at(state);
     } else if (state == exploredChoiceIndices.size() - 1) {
@@ -873,13 +850,13 @@ bool BeliefMdpExplorer<PomdpType, BeliefValueType>::needsActionAdjustment(uint64
 template<typename PomdpType, typename BeliefValueType>
 typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType BeliefMdpExplorer<PomdpType, BeliefValueType>::getLowerValueBoundAtCurrentState() const {
     STORM_LOG_ASSERT(status == Status::Exploring, "Method call is invalid in current status.");
-    return lowerValueBounds.at(currentMdpState);
+    return lowerValueBounds[getCurrentMdpState()];
 }
 
 template<typename PomdpType, typename BeliefValueType>
 typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType BeliefMdpExplorer<PomdpType, BeliefValueType>::getUpperValueBoundAtCurrentState() const {
     STORM_LOG_ASSERT(status == Status::Exploring, "Method call is invalid in current status.");
-    return upperValueBounds.at(currentMdpState);
+    return upperValueBounds[getCurrentMdpState()];
 }
 
 template<typename PomdpType, typename BeliefValueType>
@@ -925,22 +902,17 @@ typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType BeliefMdpExplo
 
 template<typename PomdpType, typename BeliefValueType>
 std::pair<bool, typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType>
-BeliefMdpExplorer<PomdpType, BeliefValueType>::computeFMSchedulerValueForMemoryNode(BeliefId const &beliefId, uint64_t index, uint64_t memoryNode) const {
+BeliefMdpExplorer<PomdpType, BeliefValueType>::computeFMSchedulerValueForMemoryNode(BeliefId const &beliefId, uint64_t memoryNode) const {
     STORM_LOG_ASSERT(!fmSchedulerValueList.empty(), "Requested finite memory scheduler value bounds but none were available.");
-    STORM_LOG_ASSERT(index < fmSchedulerValueList.size(), "Requested finite memory scheduler value bounds for index " << index << "not available.");
     auto obs = beliefManager->getBeliefObservation(beliefId);
-    if (fmSchedulerValueList.at(index).size() == 0) {
-        return {false, 0};
-    }
-    STORM_LOG_ASSERT(fmSchedulerValueList.at(index).size() > obs, "Requested value bound for observation " << obs << " not available.");
-    STORM_LOG_ASSERT(fmSchedulerValueList.at(index).at(obs).size() > memoryNode,
+    STORM_LOG_ASSERT(fmSchedulerValueList.size() > obs, "Requested value bound for observation " << obs << " not available.");
+    STORM_LOG_ASSERT(fmSchedulerValueList.at(obs).size() > memoryNode,
                      "Requested value bound for observation " << obs << " and memory node " << memoryNode << " not available.");
-    return beliefManager->getWeightedSum(beliefId, fmSchedulerValueList.at(index).at(obs).at(memoryNode));
+    return beliefManager->getWeightedSum(beliefId, fmSchedulerValueList.at(obs).at(memoryNode));
 }
 
 template<typename PomdpType, typename BeliefValueType>
-void BeliefMdpExplorer<PomdpType, BeliefValueType>::computeValuesOfExploredMdp(storm::Environment const &env, storm::solver::OptimizationDirection const &dir,
-                                                                               bool recomputeValueInInitialState) {
+void BeliefMdpExplorer<PomdpType, BeliefValueType>::computeValuesOfExploredMdp(storm::Environment const &env, storm::solver::OptimizationDirection const &dir) {
     STORM_LOG_ASSERT(status == Status::ModelFinished, "Method call is invalid in current status.");
     STORM_LOG_ASSERT(exploredMdp, "Tried to compute values but the MDP is not explored");
     auto property = createStandardProperty(dir, exploredMdp->hasRewardModel());
@@ -950,53 +922,6 @@ void BeliefMdpExplorer<PomdpType, BeliefValueType>::computeValuesOfExploredMdp(s
     if (res) {
         values = std::move(res->asExplicitQuantitativeCheckResult<ValueType>().getValueVector());
         scheduler = std::make_shared<storm::storage::Scheduler<ValueType>>(res->asExplicitQuantitativeCheckResult<ValueType>().getScheduler());
-        if (recomputeValueInInitialState) {
-            auto initState = exploredMdp->getInitialStates().getNextSetIndex(0);
-            values[initState] = storm::utility::zero<ValueType>();
-            for (auto const &successor : exploredMdp->getTransitionMatrix().getRow(initState, scheduler->getChoice(initState).getDeterministicChoice())) {
-                values[initState] += successor.getValue() * values[successor.getColumn()];
-            }
-        }
-        STORM_LOG_WARN_COND_DEBUG(storm::utility::vector::compareElementWise(lowerValueBounds, values, std::less_equal<ValueType>()),
-                                  "Computed values are smaller than the lower bound.");
-        STORM_LOG_WARN_COND_DEBUG(storm::utility::vector::compareElementWise(upperValueBounds, values, std::greater_equal<ValueType>()),
-                                  "Computed values are larger than the upper bound.");
-    } else {
-        STORM_LOG_ASSERT(storm::utility::resources::isTerminate(), "Empty check result!");
-        STORM_LOG_ERROR("No result obtained while checking.");
-    }
-    status = Status::ModelChecked;
-}
-
-template<typename PomdpType, typename BeliefValueType>
-void BeliefMdpExplorer<PomdpType, BeliefValueType>::computeDiscountedTotalRewardsOfExploredMdp(storm::Environment const &env,
-                                                                                               storm::solver::OptimizationDirection const &dir,
-                                                                                               ValueType discountFactor, bool recomputeValueInInitialState) {
-    STORM_LOG_ASSERT(status == Status::ModelFinished, "Method call is invalid in current status.");
-    STORM_LOG_ASSERT(exploredMdp, "Tried to compute values but the MDP is not explored");
-    std::string propertyString = "R";
-    propertyString += storm::solver::minimize(dir) ? "min" : "max";
-    propertyString += "=? [C{";
-    propertyString += storm::utility::to_string(discountFactor) + "}]";
-    std::vector<storm::jani::Property> propertyVector = storm::api::parseProperties(propertyString);
-    auto property = storm::api::extractFormulasFromProperties(propertyVector).front();
-
-    auto task = storm::api::createTask<ValueType>(property, false);
-    task.setProduceSchedulers();
-
-    std::unique_ptr<storm::modelchecker::CheckResult> res(storm::api::verifyWithSparseEngine<ValueType>(env, exploredMdp, task));
-    if (res) {
-        values = std::move(res->asExplicitQuantitativeCheckResult<ValueType>().getValueVector());
-        if (res->asExplicitQuantitativeCheckResult<ValueType>().hasScheduler()) {
-            scheduler = std::make_shared<storm::storage::Scheduler<ValueType>>(res->asExplicitQuantitativeCheckResult<ValueType>().getScheduler());
-            if (recomputeValueInInitialState) {
-                auto initState = exploredMdp->getInitialStates().getNextSetIndex(0);
-                values[initState] = storm::utility::zero<ValueType>();
-                for (auto const &successor : exploredMdp->getTransitionMatrix().getRow(initState, scheduler->getChoice(initState).getDeterministicChoice())) {
-                    values[initState] += successor.getValue() * values[successor.getColumn()];
-                }
-            }
-        }
         STORM_LOG_WARN_COND_DEBUG(storm::utility::vector::compareElementWise(lowerValueBounds, values, std::less_equal<ValueType>()),
                                   "Computed values are smaller than the lower bound.");
         STORM_LOG_WARN_COND_DEBUG(storm::utility::vector::compareElementWise(upperValueBounds, values, std::greater_equal<ValueType>()),
@@ -1018,11 +943,6 @@ std::vector<typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType> c
     const {
     STORM_LOG_ASSERT(status == Status::ModelChecked, "Method call is invalid in current status.");
     return values;
-}
-
-template<typename PomdpType, typename BeliefValueType>
-bool BeliefMdpExplorer<PomdpType, BeliefValueType>::hasSchedulerForExploredMdp() const {
-    return scheduler != nullptr;
 }
 
 template<typename PomdpType, typename BeliefValueType>
@@ -1263,20 +1183,20 @@ typename BeliefMdpExplorer<PomdpType, BeliefValueType>::MdpStateType BeliefMdpEx
         if (exploredMdp) {
             auto findRes = beliefIdToMdpStateMap.find(beliefId);
             if (findRes != beliefIdToMdpStateMap.end()) {
-                ValueType currentPrio = 0;
+                ValueType currentPrio;
                 switch (explHeuristic) {
                     case ExplorationHeuristic::BreadthFirst:
                         currentPrio = prio;
                         prio = prio - storm::utility::one<ValueType>();
                         break;
                     case ExplorationHeuristic::LowerBoundPrio:
-                        currentPrio = computeLowerValueBoundAtBelief(beliefId);
+                        currentPrio = getLowerValueBoundAtCurrentState();
                         break;
                     case ExplorationHeuristic::UpperBoundPrio:
-                        currentPrio = computeUpperValueBoundAtBelief(beliefId);
+                        currentPrio = getUpperValueBoundAtCurrentState();
                         break;
                     case ExplorationHeuristic::GapPrio:
-                        currentPrio = storm::utility::abs<ValueType>(computeUpperValueBoundAtBelief(beliefId) - computeLowerValueBoundAtBelief(beliefId));
+                        currentPrio = getUpperValueBoundAtCurrentState() - getLowerValueBoundAtCurrentState();
                         break;
                     case ExplorationHeuristic::ProbabilityPrio:
                         if (getCurrentMdpState() != noState()) {
@@ -1284,7 +1204,6 @@ typename BeliefMdpExplorer<PomdpType, BeliefValueType>::MdpStateType BeliefMdpEx
                         } else {
                             currentPrio = storm::utility::one<ValueType>();
                         }
-                    case ExplorationHeuristic::ExcessUncertainty:
                         break;
                     default:
                         STORM_LOG_THROW(false, storm::exceptions::NotImplementedException, "Other heuristics not implemented yet");
@@ -1296,23 +1215,24 @@ typename BeliefMdpExplorer<PomdpType, BeliefValueType>::MdpStateType BeliefMdpEx
         }
         // At this point we need to add a new MDP state
         MdpStateType result = getCurrentNumberOfMdpStates();
+        assert(getCurrentNumberOfMdpStates() == mdpStateToBeliefIdMap.size());
         mdpStateToBeliefIdMap.push_back(beliefId);
         beliefIdToMdpStateMap[beliefId] = result;
         insertValueHints(computeLowerValueBoundAtBelief(beliefId), computeUpperValueBoundAtBelief(beliefId));
-        ValueType currentPrio = 0;
+        ValueType currentPrio;
         switch (explHeuristic) {
             case ExplorationHeuristic::BreadthFirst:
                 currentPrio = prio;
                 prio = prio - storm::utility::one<ValueType>();
                 break;
             case ExplorationHeuristic::LowerBoundPrio:
-                currentPrio = computeLowerValueBoundAtBelief(beliefId);
+                currentPrio = getLowerValueBoundAtCurrentState();
                 break;
             case ExplorationHeuristic::UpperBoundPrio:
-                currentPrio = computeUpperValueBoundAtBelief(beliefId);
+                currentPrio = getUpperValueBoundAtCurrentState();
                 break;
             case ExplorationHeuristic::GapPrio:
-                currentPrio = storm::utility::abs<ValueType>(computeUpperValueBoundAtBelief(beliefId) - computeLowerValueBoundAtBelief(beliefId));
+                currentPrio = getUpperValueBoundAtCurrentState() - getLowerValueBoundAtCurrentState();
                 break;
             case ExplorationHeuristic::ProbabilityPrio:
                 if (getCurrentMdpState() != noState()) {
@@ -1320,8 +1240,6 @@ typename BeliefMdpExplorer<PomdpType, BeliefValueType>::MdpStateType BeliefMdpEx
                 } else {
                     currentPrio = storm::utility::one<ValueType>();
                 }
-                break;
-            case ExplorationHeuristic::ExcessUncertainty:
                 break;
             default:
                 STORM_LOG_THROW(false, storm::exceptions::NotImplementedException, "Other heuristics not implemented yet");
@@ -1374,24 +1292,13 @@ void BeliefMdpExplorer<PomdpType, BeliefValueType>::setExtremeValueBound(storm::
 }
 
 template<typename PomdpType, typename BeliefValueType>
-void BeliefMdpExplorer<PomdpType, BeliefValueType>::setFMSchedValueList(std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> valueList,
-                                                                        uint64_t index) {
-    STORM_LOG_ASSERT(index < fmSchedulerValueList.size(), "Requested value list with index " << index << " not available.");
-    fmSchedulerValueList[index] = valueList;
+void BeliefMdpExplorer<PomdpType, BeliefValueType>::setFMSchedValueList(std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> valueList) {
+    fmSchedulerValueList = valueList;
 }
 
 template<typename PomdpType, typename BeliefValueType>
-uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::addFMSchedValueList(std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> valueList) {
-    fmSchedulerValueList.push_back(valueList);
-    return fmSchedulerValueList.size() - 1;
-}
-
-template<typename PomdpType, typename BeliefValueType>
-uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::getNrOfMemoryNodesForObservation(uint64_t index, uint32_t observation) const {
-    if (fmSchedulerValueList.at(index).empty()) {
-        return 0;
-    }
-    return fmSchedulerValueList.at(index).at(observation).size();
+uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::getNrOfMemoryNodesForObservation(uint32_t observation) const {
+    return fmSchedulerValueList.at(observation).size();
 }
 
 template<typename PomdpType, typename BeliefValueType>
@@ -1481,47 +1388,6 @@ void BeliefMdpExplorer<PomdpType, BeliefValueType>::adjustActions(uint64_t total
         }
         return;
     }
-}
-
-template<typename PomdpType, typename BeliefValueType>
-std::vector<typename BeliefMdpExplorer<PomdpType, BeliefValueType>::BeliefId> BeliefMdpExplorer<PomdpType, BeliefValueType>::getBeliefIdsOfStatesToExplore()
-    const {
-    std::vector<BeliefId> result;
-    for (auto const &entry : mdpStatesToExploreStatePrio) {
-        result.push_back(mdpStateToBeliefIdMap[entry.first]);
-    }
-    return result;
-}
-
-template<typename PomdpType, typename BeliefValueType>
-std::unordered_map<typename BeliefMdpExplorer<PomdpType, BeliefValueType>::BeliefId,
-                   std::unordered_map<typename BeliefMdpExplorer<PomdpType, BeliefValueType>::BeliefId, BeliefValueType>>
-BeliefMdpExplorer<PomdpType, BeliefValueType>::getBeliefIdToBeliefMap(
-    std::vector<typename BeliefMdpExplorer<PomdpType, BeliefValueType>::BeliefId> beliefIds) const {
-    std::unordered_map<BeliefId, std::unordered_map<BeliefId, BeliefValueType>> result;
-    for (auto const &beliefId : beliefIds) {
-        if (beliefId != beliefManager->noId()) {
-            result[beliefId] = beliefManager->getBeliefAsMap(beliefId);
-        }
-    }
-    return result;
-}
-
-template<typename PomdpType, typename BeliefValueType>
-uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::getNrOfFMSchedulers() const {
-    return fmSchedulerValueList.size();
-}
-
-template<typename PomdpType, typename BeliefValueType>
-uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::getHorizonOfState(uint64_t state) const {
-    return stateToHorizon.at(state);
-}
-
-template<typename PomdpType, typename BeliefValueType>
-void BeliefMdpExplorer<PomdpType, BeliefValueType>::setDiscountedInformation(typename PomdpType::ValueType newDiscountFactor,
-                                                                             typename PomdpType::ValueType newPrecision) {
-    discountFactor = newDiscountFactor;
-    precision = newPrecision;
 }
 
 template class BeliefMdpExplorer<storm::models::sparse::Pomdp<double>>;
