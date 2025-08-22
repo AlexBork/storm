@@ -3,7 +3,7 @@
 #include "storm/exceptions/InvalidPropertyException.h"
 #include "storm/exceptions/InvalidStateException.h"
 #include "storm/logic/FragmentSpecification.h"
-#include "storm/modelchecker/helper/DiscountingHelper.h"
+#include "storm/modelchecker/helper/conditional/ConditionalHelper.h"
 #include "storm/modelchecker/helper/finitehorizon/SparseNondeterministicStepBoundedHorizonHelper.h"
 #include "storm/modelchecker/helper/infinitehorizon/SparseNondeterministicInfiniteHorizonHelper.h"
 #include "storm/modelchecker/helper/ltl/SparseLTLHelper.h"
@@ -57,9 +57,7 @@ bool SparseMdpPrctlModelChecker<SparseMdpModelType>::canHandleStatic(CheckTask<s
                                      .setMultiDimensionalCumulativeRewardFormulasAllowed(true)
                                      .setTimeOperatorsAllowed(true)
                                      .setReachbilityTimeFormulasAllowed(true)
-                                     .setRewardAccumulationAllowed(true)
-                                     .setDiscountedTotalRewardFormulasAllowed(true)
-                                     .setDiscountedCumulativeRewardFormulasAllowed(true))) {
+                                     .setRewardAccumulationAllowed(true))) {
             return true;
         } else if (checkTask.isOnlyInitialStatesRelevantSet()) {
             auto multiObjectiveFragment = storm::logic::multiObjective()
@@ -265,8 +263,10 @@ std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::com
     storm::logic::ConditionalFormula const& conditionalFormula = checkTask.getFormula();
     STORM_LOG_THROW(checkTask.isOptimizationDirectionSet(), storm::exceptions::InvalidPropertyException,
                     "Formula needs to specify whether minimal or maximal values are to be computed on nondeterministic model.");
-    STORM_LOG_THROW(this->getModel().getInitialStates().getNumberOfSetBits() == 1, storm::exceptions::InvalidPropertyException,
+    STORM_LOG_THROW(this->getModel().getInitialStates().hasUniqueSetBit(), storm::exceptions::InvalidPropertyException,
                     "Cannot compute conditional probabilities on MDPs with more than one initial state.");
+    STORM_LOG_THROW(checkTask.isOnlyInitialStatesRelevantSet(), storm::exceptions::InvalidPropertyException,
+                    "Conditional probabilities can only be computed for the initial states of the model.");
     STORM_LOG_THROW(conditionalFormula.getSubformula().isEventuallyFormula(), storm::exceptions::InvalidPropertyException,
                     "Illegal conditional probability formula.");
     STORM_LOG_THROW(conditionalFormula.getConditionFormula().isEventuallyFormula(), storm::exceptions::InvalidPropertyException,
@@ -276,10 +276,13 @@ std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::com
     std::unique_ptr<CheckResult> rightResultPointer = this->check(env, conditionalFormula.getConditionFormula().asEventuallyFormula().getSubformula());
     ExplicitQualitativeCheckResult const& leftResult = leftResultPointer->asExplicitQualitativeCheckResult();
     ExplicitQualitativeCheckResult const& rightResult = rightResultPointer->asExplicitQualitativeCheckResult();
-
-    return storm::modelchecker::helper::SparseMdpPrctlHelper<ValueType, SolutionType>::computeConditionalProbabilities(
-        env, storm::solver::SolveGoal<ValueType, SolutionType>(this->getModel(), checkTask), this->getModel().getTransitionMatrix(),
-        this->getModel().getBackwardTransitions(), leftResult.getTruthValuesVector(), rightResult.getTruthValuesVector());
+    if constexpr (std::is_same_v<storm::Interval, ValueType>) {
+        throw exceptions::NotImplementedException() << "Conditional Probabilities are not supported with interval models";
+    } else {
+        return storm::modelchecker::computeConditionalProbabilities(env, storm::solver::SolveGoal<ValueType, SolutionType>(this->getModel(), checkTask),
+                                                                    this->getModel().getTransitionMatrix(), this->getModel().getBackwardTransitions(),
+                                                                    leftResult.getTruthValuesVector(), rightResult.getTruthValuesVector());
+    }
 }
 
 template<typename SparseMdpModelType>
@@ -315,26 +318,6 @@ std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::com
             rewardPathFormula.getNonStrictBound<uint64_t>());
         return std::unique_ptr<CheckResult>(new ExplicitQuantitativeCheckResult<SolutionType>(std::move(numericResult)));
     }
-}
-
-template<>
-std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<storm::models::sparse::Mdp<storm::Interval>>::computeDiscountedCumulativeRewards(
-    Environment const& env, CheckTask<storm::logic::DiscountedCumulativeRewardFormula, SolutionType> const& checkTask) {
-    STORM_LOG_THROW(false, storm::exceptions::NotImplementedException, "Discounted properties are not implemented for interval models.");
-}
-
-template<typename SparseMdpModelType>
-std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::computeDiscountedCumulativeRewards(
-    Environment const& env, CheckTask<storm::logic::DiscountedCumulativeRewardFormula, SolutionType> const& checkTask) {
-    storm::logic::DiscountedCumulativeRewardFormula const& rewardPathFormula = checkTask.getFormula();
-    STORM_LOG_THROW(checkTask.isOptimizationDirectionSet(), storm::exceptions::InvalidPropertyException,
-                    "Formula needs to specify whether minimal or maximal values are to be computed on nondeterministic model.");
-    STORM_LOG_THROW(rewardPathFormula.hasIntegerBound(), storm::exceptions::InvalidPropertyException, "Formula needs to have a discrete time bound.");
-    auto rewardModel = storm::utility::createFilteredRewardModel(this->getModel(), checkTask);
-    std::vector<SolutionType> numericResult = storm::modelchecker::helper::SparseMdpPrctlHelper<ValueType, SolutionType>::computeDiscountedCumulativeRewards(
-        env, storm::solver::SolveGoal<ValueType, SolutionType>(this->getModel(), checkTask), this->getModel().getTransitionMatrix(), rewardModel.get(),
-        rewardPathFormula.getNonStrictBound<uint64_t>(), rewardPathFormula.getDiscountFactor<ValueType>());
-    return std::unique_ptr<CheckResult>(new ExplicitQuantitativeCheckResult<SolutionType>(std::move(numericResult)));
 }
 
 template<typename SparseMdpModelType>
@@ -406,31 +389,6 @@ std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::com
     return result;
 }
 
-template<>
-std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<storm::models::sparse::Mdp<storm::Interval>>::computeDiscountedTotalRewards(
-    Environment const& env, CheckTask<storm::logic::DiscountedTotalRewardFormula, SolutionType> const& checkTask) {
-    STORM_LOG_THROW(false, storm::exceptions::NotImplementedException, "Discounted properties are not implemented for interval models.");
-}
-
-template<typename SparseMdpModelType>
-std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::computeDiscountedTotalRewards(
-    Environment const& env, CheckTask<storm::logic::DiscountedTotalRewardFormula, SolutionType> const& checkTask) {
-    STORM_LOG_THROW(checkTask.isOptimizationDirectionSet(), storm::exceptions::InvalidPropertyException,
-                    "Formula needs to specify whether minimal or maximal values are to be computed on nondeterministic model.");
-    auto rewardModel = storm::utility::createFilteredRewardModel(this->getModel(), checkTask);
-    storm::logic::DiscountedTotalRewardFormula const& rewardPathFormula = checkTask.getFormula();
-    auto discountFactor = rewardPathFormula.getDiscountFactor<ValueType>();
-    auto ret = storm::modelchecker::helper::SparseMdpPrctlHelper<ValueType, SolutionType>::computeDiscountedTotalRewards(
-        env, storm::solver::SolveGoal<ValueType, SolutionType>(this->getModel(), checkTask), this->getModel().getTransitionMatrix(),
-        this->getModel().getBackwardTransitions(), rewardModel.get(), checkTask.isQualitativeSet(), checkTask.isProduceSchedulersSet(), discountFactor,
-        checkTask.getHint());
-    std::unique_ptr<CheckResult> result(new ExplicitQuantitativeCheckResult<SolutionType>(std::move(ret.values)));
-    if (checkTask.isProduceSchedulersSet() && ret.scheduler) {
-        result->asExplicitQuantitativeCheckResult<SolutionType>().setScheduler(std::move(ret.scheduler));
-    }
-    return result;
-}
-
 template<typename SparseMdpModelType>
 std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::computeLongRunAverageProbabilities(
     Environment const& env, CheckTask<storm::logic::StateFormula, SolutionType> const& checkTask) {
@@ -483,7 +441,7 @@ std::unique_ptr<CheckResult> SparseMdpPrctlModelChecker<SparseMdpModelType>::che
     if constexpr (std::is_same_v<ValueType, storm::Interval>) {
         STORM_LOG_THROW(false, storm::exceptions::NotImplementedException, "We have not yet implemented multi-objective with intervals");
     } else {
-        return multiobjective::performMultiObjectiveModelChecking(env, this->getModel(), checkTask.getFormula());
+        return multiobjective::performMultiObjectiveModelChecking(env, this->getModel(), checkTask.getFormula(), checkTask.isProduceSchedulersSet());
     }
 }
 
