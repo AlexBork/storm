@@ -1,4 +1,5 @@
 #pragma once
+#include <storm-pomdp/beliefs/exploration/ExplorationQueueOrder.h>
 
 namespace storm::pomdp::beliefs {
 enum explorationTerminationCriterion { MAX_EXPLORATION_SIZE, MAX_EXPLORATION_TIME, MAX_EXPLORATION_SIZE_AND_TIME, NONE };
@@ -9,6 +10,8 @@ struct BeliefBasedModelCheckerOptions {
     bool buildChoiceLabeling = true;
     bool generatePolicy = true;
     bool useClipping = false;
+
+    ExplorationQueueOrder explorationQueueOrder = ExplorationQueueOrder::Unordered;
 
     // Clipping abstraction parameters
     std::optional<std::vector<uint64_t>> clippingResolutions;
