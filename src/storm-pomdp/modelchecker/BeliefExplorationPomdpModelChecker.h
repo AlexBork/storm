@@ -1,7 +1,7 @@
 #include "storm-pomdp/builder/BeliefMdpExplorer.h"
 #include "storm-pomdp/modelchecker/BeliefExplorationPomdpModelCheckerOptions.h"
+#include "storm-pomdp/storage/BeliefExplorationResult.h"
 #include "storm-pomdp/storage/BeliefManager.h"
-#include "storm/utility/logging.h"
 
 #include "storm/storage/jani/Property.h"
 #include "storm/utility/Stopwatch.h"
@@ -68,20 +68,6 @@ class BeliefExplorationPomdpModelChecker {
         Converged,
     };
 
-    /**
-     * Struct used to store the results of the model checker
-     */
-    struct Result {
-        Result(ValueType lower, ValueType upper);
-        ValueType lowerBound;
-        ValueType upperBound;
-        ValueType diff(bool relative = false) const;
-        bool updateLowerBound(ValueType const& value);
-        bool updateUpperBound(ValueType const& value);
-        std::shared_ptr<storm::models::sparse::Model<ValueType>> schedulerAsMarkovChain;
-        std::vector<storm::storage::Scheduler<ValueType>> cutoffSchedulers;
-    };
-
     /* Functions */
 
     /**
@@ -99,18 +85,21 @@ class BeliefExplorationPomdpModelChecker {
      * represents a scheduler. Each scheduler is represented by a vector of maps representing (memory node x state) -> value
      * @return result of the model checking
      */
-    Result check(storm::Environment const& env, storm::logic::Formula const& formula, storm::Environment const& preProcEnv,
-                 std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
-                     std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
-    Result check(storm::logic::Formula const& formula, storm::Environment const& preProcEnv,
-                 std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
-                     std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
-    Result check(storm::logic::Formula const& formula,
-                 std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
-                     std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
-    Result check(storm::Environment const& env, storm::logic::Formula const& formula,
-                 std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
-                     std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
+    storage::BeliefExplorationResult<BeliefMDPType> check(
+        storm::Environment const& env, storm::logic::Formula const& formula, storm::Environment const& preProcEnv,
+        std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
+            std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
+    storage::BeliefExplorationResult<BeliefMDPType> check(
+        storm::logic::Formula const& formula, storm::Environment const& preProcEnv,
+        std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
+            std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
+    storage::BeliefExplorationResult<BeliefMDPType> check(
+        storm::logic::Formula const& formula, std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
+                                                  std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
+    storage::BeliefExplorationResult<BeliefMDPType> check(
+        storm::Environment const& env, storm::logic::Formula const& formula,
+        std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>> const& additionalUnderApproximationBounds =
+            std::vector<std::vector<std::unordered_map<uint64_t, ValueType>>>());
 
     /**
      * Prints statistics of the process to a given output stream
@@ -137,9 +126,11 @@ class BeliefExplorationPomdpModelChecker {
      * @param result the struct to store results
      */
     void unfoldInteractively(storm::Environment const& env, std::set<uint32_t> const& targetObservations, bool min, std::optional<std::string> rewardModelName,
-                             storm::pomdp::modelchecker::POMDPValueBounds<ValueType> const& valueBounds, Result& result);
+                             storm::pomdp::modelchecker::POMDPValueBounds<ValueType> const& valueBounds,
+                             storage::BeliefExplorationResult<BeliefMDPType>& result);
     void unfoldInteractively(std::set<uint32_t> const& targetObservations, bool min, std::optional<std::string> rewardModelName,
-                             storm::pomdp::modelchecker::POMDPValueBounds<ValueType> const& valueBounds, Result& result);
+                             storm::pomdp::modelchecker::POMDPValueBounds<ValueType> const& valueBounds,
+                             storage::BeliefExplorationResult<BeliefMDPType>& result);
 
     /**
      * Pauses a running interactive unfolding
@@ -178,7 +169,7 @@ class BeliefExplorationPomdpModelChecker {
      * Get the latest saved result obtained by the interactive unfolding
      * @return
      */
-    Result getInteractiveResult();
+    storage::BeliefExplorationResult<BeliefMDPType> getInteractiveResult();
 
     /**
      * Get a pointer to the belief explorer used in the interactive unfolding
@@ -258,7 +249,8 @@ class BeliefExplorationPomdpModelChecker {
      * @return A struct containing the final over-approximation (overApproxValue) and under-approximation (underApproxValue) values
      */
     void refineReachability(storm::Environment const& env, std::set<uint32_t> const& targetObservations, bool min, std::optional<std::string> rewardModelName,
-                            storm::pomdp::modelchecker::POMDPValueBounds<ValueType> const& valueBounds, Result& result);
+                            storm::pomdp::modelchecker::POMDPValueBounds<ValueType> const& valueBounds,
+                            storage::BeliefExplorationResult<BeliefMDPType>& result);
 
     /**
      * Builds and checks an MDP that over-approximates the POMDP behavior, i.e. provides an upper bound for maximizing and a lower bound for minimizing
@@ -365,7 +357,8 @@ class BeliefExplorationPomdpModelChecker {
 
     Status unfoldingStatus;
     UnfoldingControl unfoldingControl;
-    Result interactiveResult = Result(-storm::utility::infinity<ValueType>(), storm::utility::infinity<ValueType>());
+    storage::BeliefExplorationResult<BeliefMDPType> interactiveResult =
+        storage::BeliefExplorationResult<BeliefMDPType>(-storm::utility::infinity<ValueType>(), storm::utility::infinity<ValueType>());
 };
 
 }  // namespace modelchecker

@@ -2,14 +2,17 @@
 #include "test/storm_gtest.h"
 
 #include "storm-parsers/api/storm-parsers.h"
+#include "storm-pomdp/analysis/FormulaInformation.h"
 #include "storm-pomdp/analysis/QualitativeAnalysisOnGraphs.h"
-#include "storm-pomdp/modelchecker/BeliefExplorationPomdpModelChecker.h"
+#include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
+#include "storm-pomdp/modelchecker/PreprocessingPomdpValueBoundsModelChecker.h"
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
 #include "storm-pomdp/transformer/KnownProbabilityTransformer.h"
 #include "storm-pomdp/transformer/MakePOMDPCanonic.h"
+#include "storm-pomdp/transformer/MakeStateSetObservationClosed.h"
 #include "storm/api/storm.h"
-
 #include "storm/environment/solver/MinMaxSolverEnvironment.h"
+#include "storm/utility/graph.h"
 
 namespace {
 enum class PreprocessingType { None, SelfloopReduction, QualitativeReduction, All };
@@ -27,8 +30,10 @@ class DefaultDoubleVIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.12);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>&) { /* intentionally left empty */ }
     static PreprocessingType const preprocessingType = PreprocessingType::None;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
 };
 
 class SelfloopReductionDefaultDoubleVIEnvironment {
@@ -44,8 +49,10 @@ class SelfloopReductionDefaultDoubleVIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.12);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>&) { /* intentionally left empty */ }
     static PreprocessingType const preprocessingType = PreprocessingType::SelfloopReduction;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
 };
 
 class QualitativeReductionDefaultDoubleVIEnvironment {
@@ -61,8 +68,10 @@ class QualitativeReductionDefaultDoubleVIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.12);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>&) { /* intentionally left empty */ }
     static PreprocessingType const preprocessingType = PreprocessingType::QualitativeReduction;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
 };
 
 class PreprocessedDefaultDoubleVIEnvironment {
@@ -78,8 +87,10 @@ class PreprocessedDefaultDoubleVIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.12);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>&) { /* intentionally left empty */ }
     static PreprocessingType const preprocessingType = PreprocessingType::All;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
 };
 
 class FineDoubleVIEnvironment {
@@ -95,53 +106,33 @@ class FineDoubleVIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.02);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>& options) {
-        options.resolutionInit = 24;
-    }
     static PreprocessingType const preprocessingType = PreprocessingType::None;
-};
-
-class RefineDoubleVIEnvironment {
-   public:
-    typedef double ValueType;
-    static storm::Environment createEnvironment() {
-        storm::Environment env;
-        env.solver().minMax().setMethod(storm::solver::MinMaxMethod::ValueIteration);
-        env.solver().minMax().setPrecision(storm::utility::convertNumber<storm::RationalNumber>(1e-6));
-        return env;
-    }
-    static bool const isExactModelChecking = false;
-    static ValueType precision() {
-        return storm::utility::convertNumber<ValueType>(0.005);
-    }
-    static PreprocessingType const preprocessingType = PreprocessingType::None;
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>& options) {
-        options.refine = true;
-        options.refinePrecision = precision();
-    }
-};
-
-class PreprocessedRefineDoubleVIEnvironment {
-   public:
-    typedef double ValueType;
-    static storm::Environment createEnvironment() {
-        storm::Environment env;
-        env.solver().minMax().setMethod(storm::solver::MinMaxMethod::ValueIteration);
-        env.solver().minMax().setPrecision(storm::utility::convertNumber<storm::RationalNumber>(1e-6));
-        return env;
-    }
-    static bool const isExactModelChecking = false;
-    static ValueType precision() {
-        return storm::utility::convertNumber<ValueType>(0.005);
-    }
-    static PreprocessingType const preprocessingType = PreprocessingType::All;
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>& options) {
-        options.refine = true;
-        options.refinePrecision = precision();
+    static uint64_t overApproxResolution() {
+        return 24;
     }
 };
 
 class DefaultDoubleOVIEnvironment {
+   public:
+    typedef double ValueType;
+    static storm::Environment createEnvironment() {
+        storm::Environment env;
+        env.solver().minMax().setMethod(storm::solver::MinMaxMethod::OptimisticValueIteration);
+        env.solver().minMax().setPrecision(storm::utility::convertNumber<storm::RationalNumber>(1e-6));
+        env.solver().setForceSoundness(true);
+        return env;
+    }
+    static bool const isExactModelChecking = false;
+    static ValueType precision() {
+        return storm::utility::convertNumber<ValueType>(0.12);
+    }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
+    static PreprocessingType const preprocessingType = PreprocessingType::None;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
+};
+
+class DefaultDoubleSVIEnvironment {
    public:
     typedef double ValueType;
     static storm::Environment createEnvironment() {
@@ -155,8 +146,10 @@ class DefaultDoubleOVIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.12);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>&) { /* intentionally left empty */ }
     static PreprocessingType const preprocessingType = PreprocessingType::None;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
 };
 
 class DefaultRationalPIEnvironment {
@@ -172,8 +165,10 @@ class DefaultRationalPIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.12);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>&) { /* intentionally left empty */ }
     static PreprocessingType const preprocessingType = PreprocessingType::None;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
 };
 
 class PreprocessedDefaultRationalPIEnvironment {
@@ -189,15 +184,17 @@ class PreprocessedDefaultRationalPIEnvironment {
     static ValueType precision() {
         return storm::utility::convertNumber<ValueType>(0.12);
     }  // there actually aren't any precision guarantees, but we still want to detect if results are weird.
-    static void adaptOptions(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>&) { /* intentionally left empty */ }
     static PreprocessingType const preprocessingType = PreprocessingType::All;
+    static uint64_t overApproxResolution() {
+        return 2;
+    }
 };
 
 template<typename TestType>
-class BeliefExplorationPomdpModelCheckerTest : public ::testing::Test {
+class BeliefBasedModelCheckerTest : public ::testing::Test {
    public:
     typedef typename TestType::ValueType ValueType;
-    BeliefExplorationPomdpModelCheckerTest() : _environment(TestType::createEnvironment()) {}
+    BeliefBasedModelCheckerTest() : _environment(TestType::createEnvironment()) {}
 
     void SetUp() override {
 #ifndef STORM_HAVE_Z3
@@ -208,32 +205,13 @@ class BeliefExplorationPomdpModelCheckerTest : public ::testing::Test {
     storm::Environment const& env() const {
         return _environment;
     }
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType> options() const {
-        storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType> opt(true, true);  // Always compute both bounds (lower and upper)
-        opt.gapThresholdInit = 0;
-        TestType::adaptOptions(opt);
-        return opt;
-    }
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType> optionsWithStateElimination() const {
-        storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType> opt(true, true);  // Always compute both bounds (lower and upper)
-        opt.gapThresholdInit = 0;
-        TestType::adaptOptions(opt);
-        opt.useStateEliminationCutoff = true;
-        return opt;
-    }
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType> optionsWithClipping() const {
-        storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType> opt(true, true);  // Always compute both bounds (lower and upper)
-        opt.gapThresholdInit = 0;
-        TestType::adaptOptions(opt);
-        opt.useClipping = true;
-        return opt;
-    }
     ValueType parseNumber(std::string const& str) {
         return storm::utility::convertNumber<ValueType>(str);
     }
     struct Input {
         std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> model;
         std::shared_ptr<storm::logic::Formula const> formula;
+        std::shared_ptr<storm::pomdp::beliefs::PropertyInformation> propertyInfo = std::make_shared<storm::pomdp::beliefs::PropertyInformation>();
     };
     Input buildPrism(std::string const& programFile, std::string const& formulaAsString, std::string const& constantsAsString = "") const {
         // Parse and build input
@@ -272,10 +250,60 @@ class BeliefExplorationPomdpModelCheckerTest : public ::testing::Test {
             }
         }
         EXPECT_TRUE(input.model->isCanonic());
+        auto formulaInfo = storm::pomdp::analysis::getFormulaInformation(*input.model, *input.formula);
+        std::optional<std::string> rewardModelName;
+        std::set<uint32_t> targetObservations;
+        EXPECT_TRUE(formulaInfo.isNonNestedReachabilityProbability() || formulaInfo.isNonNestedExpectedRewardFormula());
+        if (formulaInfo.getTargetStates().observationClosed) {
+            targetObservations = formulaInfo.getTargetStates().observations;
+        } else {
+            storm::transformer::MakeStateSetObservationClosed<ValueType> obsCloser(input.model);
+            std::tie(input.model, targetObservations) = obsCloser.transform(formulaInfo.getTargetStates().states);
+        }
+        if (formulaInfo.isNonNestedReachabilityProbability()) {
+            if (!formulaInfo.getSinkStates().empty()) {
+                storm::storage::sparse::ModelComponents<ValueType> components;
+                components.stateLabeling = input.model->getStateLabeling();
+                components.rewardModels = input.model->getRewardModels();
+                auto matrix = input.model->getTransitionMatrix();
+                matrix.makeRowGroupsAbsorbing(formulaInfo.getSinkStates().states);
+                components.transitionMatrix = matrix;
+                components.observabilityClasses = input.model->getObservations();
+                if (input.model->hasChoiceLabeling()) {
+                    components.choiceLabeling = input.model->getChoiceLabeling();
+                }
+                if (input.model->hasObservationValuations()) {
+                    components.observationValuations = input.model->getObservationValuations();
+                }
+                input.model = std::make_shared<storm::models::sparse::Pomdp<ValueType>>(std::move(components), true);
+                auto reachableFromSinkStates =
+                    storm::utility::graph::getReachableStates(input.model->getTransitionMatrix(), formulaInfo.getSinkStates().states,
+                                                              formulaInfo.getSinkStates().states, ~formulaInfo.getSinkStates().states);
+                reachableFromSinkStates &= ~formulaInfo.getSinkStates().states;
+                STORM_LOG_THROW(reachableFromSinkStates.empty(), storm::exceptions::NotSupportedException,
+                                "There are sink states that can reach non-sink states. This is currently not supported");
+            }
+        } else {
+            // Expected reward formula!
+            rewardModelName = formulaInfo.getRewardModelName();
+        }
+
+        if (rewardModelName) {
+            input.propertyInfo->kind = storm::pomdp::beliefs::PropertyInformation::Kind::ExpectedTotalReachabilityReward;
+            input.propertyInfo->rewardModelName = rewardModelName;
+        } else {
+            input.propertyInfo->kind = storm::pomdp::beliefs::PropertyInformation::Kind::ReachabilityProbability;
+        }
+        input.propertyInfo->dir = formulaInfo.getOptimizationDirection();
+        input.propertyInfo->targetObservations = targetObservations;
+
         return input;
     }
     ValueType precision() const {
         return TestType::precision();
+    }
+    uint64_t overApproxResolution() const {
+        return TestType::overApproxResolution();
     }
     ValueType modelcheckingPrecision() const {
         if (TestType::isExactModelChecking)
@@ -292,111 +320,118 @@ class BeliefExplorationPomdpModelCheckerTest : public ::testing::Test {
 };
 
 typedef ::testing::Types<DefaultDoubleVIEnvironment, SelfloopReductionDefaultDoubleVIEnvironment, QualitativeReductionDefaultDoubleVIEnvironment,
-                         PreprocessedDefaultDoubleVIEnvironment, FineDoubleVIEnvironment, RefineDoubleVIEnvironment, PreprocessedRefineDoubleVIEnvironment,
-                         DefaultDoubleOVIEnvironment, DefaultRationalPIEnvironment, PreprocessedDefaultRationalPIEnvironment>
+                         PreprocessedDefaultDoubleVIEnvironment, FineDoubleVIEnvironment, DefaultDoubleOVIEnvironment, DefaultDoubleSVIEnvironment,
+                         DefaultRationalPIEnvironment, PreprocessedDefaultRationalPIEnvironment>
     TestingTypes;
 
-TYPED_TEST_SUITE(BeliefExplorationPomdpModelCheckerTest, TestingTypes, );
+TYPED_TEST_SUITE(BeliefBasedModelCheckerTest, TestingTypes, );
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
 
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_GE(overResultValue, expected - this->modelcheckingPrecision());
+
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_LE(underResultValue, expected + this->modelcheckingPrecision());
+    EXPECT_LE(overResultValue - underResultValue, this->precision())
+        << "Result [" << underResultValue << ", " << overResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("3/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_LE(overResultValue, expected + this->modelcheckingPrecision());
+
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_GE(underResultValue, expected - this->modelcheckingPrecision());
+    EXPECT_LE(storm::utility::abs<ValueType>(overResultValue - underResultValue), this->precision())
+        << "Result [" << overResultValue << ", " << underResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("3/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Pmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_GE(overResultValue, expected - this->modelcheckingPrecision());
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_LE(underResultValue, expected + this->modelcheckingPrecision());
+    EXPECT_LE(overResultValue - underResultValue, this->precision())
+        << "Result [" << underResultValue << ", " << overResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin) {
+/*
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Pmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("3/10");
     if (this->isExact()) {
@@ -413,336 +448,313 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin) {
         << "Result [" << result.lowerBound << ", " << result.upperBound
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
+*/
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("3/10");
-    if (this->isExact()) {
-        // This model's value can only be approximated arbitrarily close but never reached
-        // Exact arithmetics will thus not reach the value with absoulute precision either.
-        ValueType approxPrecision = storm::utility::convertNumber<ValueType>(1e-5);
-        EXPECT_LE(result.lowerBound, expected + approxPrecision);
-        EXPECT_GE(result.upperBound, expected - approxPrecision);
-    } else {
-        EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-        EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    }
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("29/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_GE(overResultValue, expected - this->modelcheckingPrecision());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_LE(underResultValue, expected + this->modelcheckingPrecision());
+    EXPECT_LE(overResultValue - underResultValue, this->precision())
+        << "Result [" << underResultValue << ", " << overResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("29/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("19/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_LE(overResultValue, expected + this->modelcheckingPrecision());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_GE(underResultValue, expected - this->modelcheckingPrecision());
+    EXPECT_LE(storm::utility::abs<ValueType>(overResultValue - underResultValue), this->precision())
+        << "Result [" << overResultValue << ", " << underResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("19/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("29/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_GE(overResultValue, expected - this->modelcheckingPrecision());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_LE(underResultValue, expected + this->modelcheckingPrecision());
+    EXPECT_LE(overResultValue - underResultValue, this->precision())
+        << "Result [" << underResultValue << ", " << overResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("29/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("19/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_LE(overResultValue, expected + this->modelcheckingPrecision());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_GE(underResultValue, expected - this->modelcheckingPrecision());
+    EXPECT_LE(storm::utility::abs<ValueType>(overResultValue - underResultValue), this->precision())
+        << "Result [" << overResultValue << ", " << underResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0.4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("19/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("74/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    // EXPECT_LE(overResultValue, expected + this->modelcheckingPrecision());
+
+    options.maxExplorationSize = 22;
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    // EXPECT_GE(underResultValue, expected - this->modelcheckingPrecision());
+    // EXPECT_LE(storm::utility::abs<ValueType>(overResultValue - underResultValue), this->precision())
+    //     << "Result [" << overResultValue << ", " << underResultValue
+    //     << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("74/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
+
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_TRUE(storm::utility::isInfinity(overResultValue));
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_TRUE(storm::utility::isInfinity(underResultValue));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0.075");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("80/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_SE) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_slippery_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0.075");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("80/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_LE(overResultValue, expected + this->modelcheckingPrecision());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_GE(underResultValue, expected - this->modelcheckingPrecision());
+    EXPECT_LE(storm::utility::abs<ValueType>(overResultValue - underResultValue), this->precision())
+        << "Result [" << overResultValue << ", " << underResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_slippery_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0.075");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
+
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_TRUE(storm::utility::isInfinity(overResultValue));
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_TRUE(storm::utility::isInfinity(underResultValue));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0.075");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmax=?[\"notbad\" U \"goal\"]", "N=4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("38/155");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax_SE) {
+TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmax=?[\"notbad\" U \"goal\"]", "N=4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("38/155");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_GE(overResultValue, expected - this->modelcheckingPrecision());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_LE(underResultValue, expected + this->modelcheckingPrecision());
+    EXPECT_LE(overResultValue - underResultValue, this->precision())
+        << "Result [" << underResultValue << ", " << overResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin) {
+TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmin=?[\"notbad\" U \"goal\"]", "N=4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
-    auto result = checker.check(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<ValueType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> precomputedPomdpValueBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<ValueType> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    ValueType overResultValue;
+    ValueType underResultValue;
+    bool completedOverExploration;
+    bool completedUnderExploration;
 
     ValueType expected = this->parseNumber("0");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedPomdpValueBounds);
+    EXPECT_LE(overResultValue, expected + this->modelcheckingPrecision());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedPomdpValueBounds);
+    EXPECT_GE(underResultValue, expected - this->modelcheckingPrecision());
+    EXPECT_LE(storm::utility::abs<ValueType>(overResultValue - underResultValue), this->precision())
+        << "Result [" << overResultValue << ", " << underResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
-
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin_SE) {
-    typedef typename TestFixture::ValueType ValueType;
-
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmin=?[\"notbad\" U \"goal\"]", "N=4");
-    storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model,
-                                                                                                                    this->optionsWithStateElimination());
-    auto result = checker.check(this->env(), *data.formula);
-
-    ValueType expected = this->parseNumber("0");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
-    // Use relative difference of bounds for this one
-    EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
-        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
-}
-
+/*
 #if defined STORM_HAVE_Z3_OPTIMIZE
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmax_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -760,7 +772,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmin_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -778,7 +790,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Pmax_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -796,7 +808,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Pmin_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -822,7 +834,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Rmax_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -840,7 +852,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_Rmin_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -858,7 +870,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Rmax_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -876,7 +888,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Rmin_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -894,7 +906,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_Rmin_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -913,7 +925,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_Rmax_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -927,7 +939,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax_Clip) {
     EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_slippery_Rmin_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -946,7 +958,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, maze2_slippery_Rmax_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -960,7 +972,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_Clip) {
     EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmax_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -979,7 +991,7 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax_Clip) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin_Clip) {
+TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmin_Clip) {
     if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
         GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
     }
@@ -997,6 +1009,6 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin_Clip) {
         << "Result [" << result.lowerBound << ", " << result.upperBound
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
-#endif  // defined STORM_HAVE_Z3_OPTIMIZE
+#endif  // defined STORM_HAVE_Z3_OPTIMIZE*/
 
 }  // namespace

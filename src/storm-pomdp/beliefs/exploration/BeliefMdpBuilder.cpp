@@ -37,7 +37,7 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
 std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
-    PropertyInformation const& propertyInformation, std::function<BeliefMdpValueType(BeliefType const&)> computeCutOffValue) {
+    PropertyInformation const& propertyInformation, std::function<BeliefMdpValueType(BeliefType const&)> const& computeCutOffValue) {
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::ReachabilityProbability ||
                          propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward,
                      "Unexpected kind of property.");
@@ -155,7 +155,7 @@ template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTran
 std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
     ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
     PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> computeCutOffValueMap) {
+    std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> const& computeCutOffValueMap) {
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::ReachabilityProbability ||
                          propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward,
                      "Unexpected kind of property.");
@@ -332,69 +332,74 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<double(Belief<double> const&)> computeCutOffValue);
+    std::function<double(Belief<double> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<storm::RationalNumber(Belief<double> const&)> computeCutOffValue);
+    std::function<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>(Belief<double> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<double(Belief<storm::RationalNumber> const&)> computeCutOffValue);
+    std::function<double(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<storm::RationalNumber(Belief<storm::RationalNumber> const&)> computeCutOffValue);
+    std::function<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdp(
     ExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<double> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, double>(Belief<double> const&)> const& computeCutOffValueMap);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdp(
     ExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<double> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, __gmp_expr<__mpq_struct[1], __mpq_struct[1]>>(Belief<double> const&)> const& computeCutOffValueMap);
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdp(
     ExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<storm::RationalNumber> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, double>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValueMap);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdp(
     ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<storm::RationalNumber> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, __gmp_expr<__mpq_struct[1], __mpq_struct[1]>>(
+        Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValueMap);
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<double, Belief<double>, std::vector<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<double(Belief<double> const&)> computeCutOffValue);
+    std::function<double(Belief<double> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<storm::RationalNumber, Belief<double>, std::vector<storm::RationalNumber>> const& explorationInformation,
-    PropertyInformation const& propertyInformation, std::function<storm::RationalNumber(Belief<double> const&)> computeCutOffValue);
+    PropertyInformation const& propertyInformation,
+    std::function<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>(Belief<double> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<double, Belief<storm::RationalNumber>, std::vector<double>> const& explorationInformation,
-    PropertyInformation const& propertyInformation, std::function<double(Belief<storm::RationalNumber> const&)> computeCutOffValue);
+    PropertyInformation const& propertyInformation,
+    std::function<double(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>, std::vector<storm::RationalNumber>> const& explorationInformation,
-    PropertyInformation const& propertyInformation, std::function<storm::RationalNumber(Belief<storm::RationalNumber> const&)> computeCutOffValue);
+    PropertyInformation const& propertyInformation,
+    std::function<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValue);
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdp(
     ExplorationInformation<double, Belief<double>, std::vector<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<double> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, double>(Belief<double> const&)> const& computeCutOffValueMap);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdp(
     ExplorationInformation<storm::RationalNumber, Belief<double>, std::vector<storm::RationalNumber>> const& explorationInformation,
     PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<double> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, __gmp_expr<__mpq_struct[1], __mpq_struct[1]>>(Belief<double> const&)> const& computeCutOffValueMap);
 
 template std::shared_ptr<storm::models::sparse::Mdp<double>> buildBeliefMdp(
     ExplorationInformation<double, Belief<storm::RationalNumber>, std::vector<double>> const& explorationInformation,
     PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<storm::RationalNumber> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, double>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValueMap);
 
 template std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>> buildBeliefMdp(
     ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>, std::vector<storm::RationalNumber>> const& explorationInformation,
     PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<storm::RationalNumber> const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, __gmp_expr<__mpq_struct[1], __mpq_struct[1]>>(
+        Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValueMap);
 
 }  // namespace storm::pomdp::beliefs

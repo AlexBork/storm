@@ -3,11 +3,10 @@
 #include <deque>
 #include <set>
 
+#include "storm-pomdp/beliefs/exploration/ExplorationQueueOrder.h"
 #include "storm-pomdp/beliefs/utility/types.h"
 
 namespace storm::pomdp::beliefs {
-
-enum class ExplorationQueueOrder { Unordered, FIFO, LIFO };
 
 class ExplorationQueue {
    public:

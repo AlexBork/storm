@@ -182,7 +182,7 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     storm::utility::Stopwatch swExplore(true);
     BeliefExplorationType exploration(pomdp);
 
-    auto info = exploration.template initializeExploration<InfoType>(pomdp.getNrObservations());
+    auto info = exploration.template initializeExploration<InfoType>(pomdp.getNrObservations(), options.explorationQueueOrder);
     info.generateChoiceLabeling = options.buildChoiceLabeling;
 
     // Determine terminationCallback based on options
@@ -229,8 +229,8 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
         // TODO: Implement policy extraction
         STORM_LOG_ASSERT(res->asQuantitativeCheckResult<BeliefMdpValueType>().hasScheduler() && options.buildChoiceLabeling,
                          "Model checking of belief MDP did not return a policy.");
-        storm::api::exportScheduler(std::static_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(beliefMdp),
-                                    res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>().getScheduler(), "/Users/bork/Desktop/policy.json");
+        /*storm::api::exportScheduler(std::static_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(beliefMdp),
+                                    res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>().getScheduler(), "/Users/bork/Desktop/policy.json");*/
     }
     return {res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>()[initState], !earlyExplorationStop};
 }
@@ -257,7 +257,7 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
 
 // TODO: Check which instantiations are actually necessary / reasonable.
 template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, double, double>;
-template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, storm::RationalNumber, double>;
-template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>, double, storm::RationalNumber>;
+//  template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, storm::RationalNumber, double>;
+//  template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>, double, storm::RationalNumber>;
 template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>, storm::RationalNumber, storm::RationalNumber>;
 }  // namespace storm::pomdp::beliefs

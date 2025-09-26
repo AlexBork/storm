@@ -79,11 +79,11 @@ template void BeliefExploration<double, storm::models::sparse::Pomdp<double>, Be
     TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName,
     storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<Belief<double>>> abstraction);
 
-template void BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>::resumeExploration(
-    StandardExplorationInformation<double, Belief<storm::RationalNumber>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
+template void BeliefExploration<storm::RationalNumber, storm::models::sparse::Pomdp<storm::RationalNumber>, Belief<storm::RationalNumber>>::resumeExploration(
+    StandardExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
     TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName, storm::OptionalRef<NoAbstractionType> abstraction);
-template void BeliefExploration<double, storm::models::sparse::Pomdp<double>, Belief<storm::RationalNumber>>::resumeExploration(
-    StandardExplorationInformation<double, Belief<storm::RationalNumber>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
+template void BeliefExploration<storm::RationalNumber, storm::models::sparse::Pomdp<storm::RationalNumber>, Belief<storm::RationalNumber>>::resumeExploration(
+    StandardExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>>& info, TerminalBeliefCallback const& terminalBeliefCallback,
     TerminationCallback const& terminationCallback, storm::OptionalRef<std::string const> rewardModelName,
-    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<Belief<double>>> abstraction);
+    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<Belief<storm::RationalNumber>>> abstraction);
 }  // namespace storm::pomdp::beliefs

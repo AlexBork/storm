@@ -29,7 +29,7 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
 std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
-    PropertyInformation const& propertyInformation, std::function<BeliefMdpValueType(BeliefType const&)> computeCutOffValue);
+    PropertyInformation const& propertyInformation, std::function<BeliefMdpValueType(BeliefType const&)> const& computeCutOffValue);
 
 /**
  * Builds a belief MDP from the given exploration information and property information.
@@ -47,6 +47,6 @@ template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTran
 std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdp(
     ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
     PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> const& computeCutOffValueMap);
 
 }  // namespace storm::pomdp::beliefs
