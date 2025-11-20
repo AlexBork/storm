@@ -76,6 +76,9 @@ class BeliefExplorationSettings : public ModuleSettings {
 
     bool isBeliefMDPNumberTypeDouble() const;
     bool isBeliefMDPNumberTypeRational() const;
+    bool isBeliefMDPNumberTypeMatch() const;
+
+    bool isInexactPreprocessingSet() const;
 
     template<typename ValueType>
     void setValuesInOptionsStruct(storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>& options) const;
