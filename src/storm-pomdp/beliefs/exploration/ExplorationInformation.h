@@ -33,4 +33,8 @@ using StandardExplorationInformation = ExplorationInformation<BeliefMdpValueType
 
 template<typename BeliefMdpValueType, typename BeliefType>
 using RewardAwareExplorationInformation = ExplorationInformation<BeliefMdpValueType, BeliefType, std::vector<BeliefMdpValueType>>;
+
+template<typename BeliefMdpValueType, typename BeliefType>
+using ClippingExplorationInformation =
+    ExplorationInformation<BeliefMdpValueType, BeliefType, std::optional<BeliefMdpValueType>, std::optional<BeliefMdpValueType>>;
 }  // namespace storm::pomdp::beliefs
