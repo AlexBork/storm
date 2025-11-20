@@ -52,7 +52,7 @@ class Belief {
     bool operator==(Belief const& other) const;
 
     /*!
-     * A (human readable) string representation of this belief
+     * A (human-readable) string representation of this belief
      * @param convertToDouble if true, numbers are converted to double before printing. If this has ValueType=RationalNumber, the output as double is readable
      * but potentially imprecise
      */
@@ -123,7 +123,7 @@ class Belief {
         static_assert(BeliefFlatMapIsOrdered);
         auto const zero = storm::utility::zero<ValueType>();
         auto it2 = other.data.cbegin();
-        auto const it2End = data.cend();
+        auto const it2End = other.data.cend();
         if (considerOnlyThisSupport) {
             for (auto const& [state1, value1] : data) {
                 while (it2 != it2End && it2->first < state1) {
