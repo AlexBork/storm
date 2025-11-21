@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include "storm-pomdp/beliefs/storage/BeliefBuilder.h"
-#include "storm-pomdp/beliefs/utility/BeliefNumerics.h"
 #include "storm-pomdp/beliefs/utility/types.h"
 #include "storm/solver/LpSolverForward.h"
 #include "storm/storage/BitVector.h"
@@ -28,25 +26,43 @@ class ClippingBeliefAbstraction {
         bool onGrid = false;
     };
 
-    ClippingBeliefAbstraction(std::vector<uint64_t>&& observationResolutions);
+    explicit ClippingBeliefAbstraction(std::vector<uint64_t>&& observationResolutions);
+
+    ClippingBeliefAbstraction(std::vector<uint64_t>&& observationResolutions, std::vector<BeliefValueType>&& extremalRewardValues,
+                              storm::storage::BitVector&& isInfinite);
 
     template<typename AbstractCallback>
     void abstract(BeliefType&& belief, BeliefValueType&& probabilityFactor, AbstractCallback const& callback) {
         BeliefClipping clipping = clipBeliefToGrid(belief, observationResolutions[belief.observation()]);
         if (clipping.isClippable) {
             BeliefValueType a = (storm::utility::one<BeliefValueType>() - clipping.delta) * probabilityFactor;
-            callback(std::move(a), std::move(clipping.targetBelief));
+            BeliefValueType b = clipping.delta * probabilityFactor;
+            if (extremalRewardValues.has_value()) {
+                // We compute the reward adjustment necessary for clipping (see https://doi.org/10.48550/arXiv.2201.08772)
+                // Because we don't add clipped beliefs into the abstraction MDP, we compute the influence of the clipping transition (based on the expected
+                // reward value in the implicit clipped belief) here such that we can simply add the value to the state-action reward of the transition
+                auto rewardAdjustment = storm::utility::zero<BeliefValueType>();
+                for (auto const& [state, deltaValue] : clipping.deltaValues) {
+                    rewardAdjustment += deltaValue * extremalRewardValues->at(state);
+                }
+                rewardAdjustment = probabilityFactor * rewardAdjustment;
+                callback(std::move(clipping.targetBelief), std::move(a), std::move(b), std::move(rewardAdjustment));
+            } else {
+                callback(std::move(clipping.targetBelief), std::move(a), std::move(b), std::nullopt);
+            }
         } else {
             // Belief on Grid
-            callback(std::move(probabilityFactor), std::move(belief));
+            callback(std::move(belief), std::move(probabilityFactor), std::nullopt, std::nullopt);
         }
     }
 
-    BeliefClipping clipBeliefToGrid(BeliefType const& belief, uint64_t resolution, const storm::storage::BitVector& isInfinite);
+    BeliefClipping clipBeliefToGrid(BeliefType const& belief, uint64_t resolution);
 
    private:
     std::vector<uint64_t> observationResolutions;
     std::shared_ptr<storm::solver::LpSolver<BeliefValueType>> lpSolver;
+    std::optional<std::vector<BeliefValueType>> extremalRewardValues = std::nullopt;
+    std::optional<storm::storage::BitVector> isInfinite = std::nullopt;
 };
 
 }  // namespace storm::pomdp::beliefs

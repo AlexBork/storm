@@ -8,8 +8,9 @@
 #include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
 
+#include "storm-pomdp/beliefs/abstraction/ClippingBeliefAbstraction.h"
+#include "storm-pomdp/beliefs/policy/PolicyExtractor.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelCheckerOptions.h"
-#include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/api/verification.h"
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/utility/OptionalRef.h"
@@ -22,6 +23,22 @@ namespace storm::pomdp::beliefs {
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
 BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::BeliefBasedModelChecker(PomdpModelType const& pomdp) : inputPomdp(pomdp) {
     STORM_LOG_ERROR_COND(inputPomdp.isCanonic(), "Input Pomdp is not known to be canonic. This might lead to unexpected verification results.");
+}
+
+template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
+BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::BeliefBasedModelChecker(
+    PomdpModelType const& pomdp, storm::models::sparse::Pomdp<storm::RationalNumber> const&)
+    : inputPomdp(pomdp) {
+    STORM_LOG_THROW(false, storm::exceptions::NotSupportedException,
+                    "The requested constructor is only available for checking floating point POMDPs with exact beliefs.");
+}
+
+template<>
+BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, storm::RationalNumber, double>::BeliefBasedModelChecker(
+    storm::models::sparse::Pomdp<double> const& pomdp, storm::models::sparse::Pomdp<storm::RationalNumber> const& exactInputPomdp)
+    : inputPomdp(pomdp), exactPomdp(exactInputPomdp) {
+    STORM_LOG_ERROR_COND(inputPomdp.isCanonic(), "Input POMDP is not known to be canonic. This might lead to unexpected verification results.");
+    STORM_LOG_ERROR_COND(exactPomdp->isCanonic(), "Exact POMDP is not known to be canonic. This might lead to unexpected verification results.");
 }
 
 template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType, typename InfoType>
@@ -60,7 +77,8 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
 template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType>
 typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::TerminalBeliefCallback getTerminalBeliefCallback(
     PropertyInformation const& propertyInformation, storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-    storm::pomdp::storage::PreprocessingPomdpValueBounds<BeliefMdpValueType> const& valueBounds) {
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<typename PomdpModelType::ValueType> const& valueBounds) {
+    using PomdpValueType = PomdpModelType::ValueType;
     if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
         if (options.maxGapToCut.has_value()) {
             // Terminate if the gap is small enough
@@ -70,16 +88,21 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
                         return storm::utility::zero<BeliefMdpValueType>();
                     } else {
                         // TODO add scheduler information if requested
-                        auto smallestUpper = storm::utility::infinity<BeliefMdpValueType>();
+                        auto smallestUpper = storm::utility::infinity<PomdpValueType>();
                         for (auto const& valueList : valueBounds.upper) {
-                            smallestUpper = std::min(smallestUpper, belief.template getWeightedSum<BeliefMdpValueType>(valueList));
+                            smallestUpper = std::min(smallestUpper, belief.template getWeightedSum<PomdpValueType>(valueList));
                         }
-                        BeliefMdpValueType largestLower = -storm::utility::infinity<BeliefMdpValueType>();
+                        PomdpValueType largestLower = -storm::utility::infinity<PomdpValueType>();
                         for (auto const& valueList : valueBounds.lower) {
-                            largestLower = std::max(largestLower, belief.template getWeightedSum<BeliefMdpValueType>(valueList));
+                            largestLower = storm::utility::max(largestLower, belief.template getWeightedSum<PomdpValueType>(valueList));
                         }
-                        if (storm::utility::abs<BeliefMdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
-                            return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
+                        if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
+                            if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
+                                return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
+                            } else {
+                                return storm::utility::convertNumber<BeliefMdpValueType>(
+                                    propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper);
+                            }
                         }
                         return std::nullopt;
                     }
@@ -100,16 +123,21 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
                 return storm::utility::one<BeliefMdpValueType>();
             } else {
                 // TODO add scheduler information if requested
-                auto smallestUpper = storm::utility::infinity<BeliefMdpValueType>();
+                auto smallestUpper = storm::utility::infinity<PomdpValueType>();
                 for (auto const& valueList : valueBounds.upper) {
-                    smallestUpper = std::min(smallestUpper, belief.template getWeightedSum<BeliefMdpValueType>(valueList));
+                    smallestUpper = std::min(smallestUpper, belief.template getWeightedSum<PomdpValueType>(valueList));
                 }
-                BeliefMdpValueType largestLower = -storm::utility::infinity<BeliefMdpValueType>();
+                PomdpValueType largestLower = -storm::utility::infinity<PomdpValueType>();
                 for (auto const& valueList : valueBounds.lower) {
-                    largestLower = std::max(largestLower, belief.template getWeightedSum<BeliefMdpValueType>(valueList));
+                    largestLower = storm::utility::max(largestLower, belief.template getWeightedSum<PomdpValueType>(valueList));
                 }
-                if (storm::utility::abs<BeliefMdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
-                    return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
+                if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
+                    if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
+                        return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
+                    } else {
+                        return storm::utility::convertNumber<BeliefMdpValueType>(
+                            propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper);
+                    }
                 }
                 return std::nullopt;
             }
@@ -125,25 +153,30 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
     }
 }
 
-template<typename BeliefType, typename BeliefMdpValueType, typename InfoType>
-std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpFromInfo(
-    PropertyInformation const& propertyInformation, storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-    storm::pomdp::storage::PreprocessingPomdpValueBounds<BeliefMdpValueType> const& valueBounds, InfoType const& info) {
+template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType, typename InfoType>
+std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpFromInfo(
+    PropertyInformation const& propertyInformation, BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+    storm::pomdp::storage::PreprocessingPomdpValueBounds<typename PomdpModelType::ValueType> const& valueBounds, InfoType const& info) {
+    using PomdpValueType = PomdpModelType::ValueType;
     if (options.implicitCutOffs) {
         std::function<BeliefMdpValueType(BeliefType const&)> computeCutOffValue = [&valueBounds, &propertyInformation](BeliefType const& belief) {
             // TODO: extend with different sources for cut-offs
-            auto result = storm::utility::infinity<BeliefMdpValueType>();
+            auto result = storm::utility::infinity<PomdpValueType>();
             if (propertyInformation.dir == storm::OptimizationDirection::Minimize) {
                 for (auto const& valueList : valueBounds.upper) {
-                    result = std::min(result, belief.template getWeightedSum<BeliefMdpValueType>(valueList));
+                    result = std::min(result, belief.template getWeightedSum<PomdpValueType>(valueList));
                 }
             } else {
-                result = -storm::utility::infinity<BeliefMdpValueType>();
+                result = -storm::utility::infinity<PomdpValueType>();
                 for (auto const& valueList : valueBounds.lower) {
-                    result = std::max(result, belief.template getWeightedSum<BeliefMdpValueType>(valueList));
+                    result = std::max(result, belief.template getWeightedSum<PomdpValueType>(valueList));
                 }
             }
-            return result;
+            if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
+                return result;
+            } else {
+                return storm::utility::convertNumber<BeliefMdpValueType>(result);
+            }
         };
         return buildBeliefMdpWithImplicitCutoffs(info, propertyInformation, computeCutOffValue);
     } else {
@@ -154,9 +187,13 @@ std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> buildBeliefMdpFr
                     propertyInformation.dir == storm::OptimizationDirection::Minimize ? valueBounds.upper.size() : valueBounds.lower.size();
                 std::unordered_map<std::string, BeliefMdpValueType> result;
                 for (uint64_t i = 0; i < nrCutoffPolicies; ++i) {
-                    auto val = belief.template getWeightedSum<BeliefMdpValueType>(
+                    auto val = belief.template getWeightedSum<PomdpValueType>(
                         propertyInformation.dir == storm::OptimizationDirection::Minimize ? valueBounds.upper.at(i) : valueBounds.lower.at(i));
-                    result["sched_" + std::to_string(i)] = val;
+                    if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
+                        result["__sched_" + std::to_string(i)] = val;
+                    } else {
+                        result["__sched_" + std::to_string(i)] = storm::utility::convertNumber<BeliefMdpValueType>(val);
+                    }
                 }
                 return result;
             };
@@ -169,7 +206,7 @@ template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueTy
 std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment const& env, PomdpModelType const& pomdp,
                                                             PropertyInformation const& propertyInformation,
                                                             storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                            storm::pomdp::storage::PreprocessingPomdpValueBounds<BeliefMdpValueType> const& valueBounds,
+                                                            storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
                                                             storm::OptionalRef<AbstractionType> abstraction = {}) {
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::ReachabilityProbability ||
                          propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward,
@@ -191,23 +228,49 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
 
     // Determine terminalBeliefCallback based on options
     typename BeliefExplorationType::TerminalBeliefCallback terminalBeliefCallback =
-        getTerminalBeliefCallback<PomdpModelType, BeliefType, BeliefMdpValueType>(propertyInformation, options, valueBounds);
+        getTerminalBeliefCallback<PomdpModelType, BeliefType, BeliefMdpValueType>(propertyInformation, options, *valueBounds.preprocessingBounds);
 
-    if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
-        exploration.resumeExploration(info, terminalBeliefCallback, terminationCallback, propertyInformation.rewardModelName.value(), abstraction);
+    if constexpr (std::is_same_v<InfoType, ClippingExplorationInformation<BeliefMdpValueType, BeliefType>>) {
+        STORM_LOG_ASSERT(options.useClipping, "Clipping exploration information requires clipping to be enabled.");
+        if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
+            exploration.resumeClippingExploration(info, terminalBeliefCallback, terminationCallback, propertyInformation.rewardModelName.value(), abstraction);
+        } else {
+            exploration.resumeClippingExploration(info, terminalBeliefCallback, terminationCallback, storm::NullRef, abstraction);
+        }
+        STORM_LOG_TRACE("Starting clipping phase.");
+        STORM_LOG_ASSERT(options.clippingResolutions.has_value(), "Clipping requested, but no resolution vector given.");
+        std::vector<uint64_t> resolutions(options.clippingResolutions.value());
+        if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
+            STORM_LOG_ASSERT(valueBounds.extremeBounds.has_value(),
+                             "Clipping for expected total reachability reward requires extreme value bounds to be given.");
+            ClippingBeliefAbstraction<BeliefType> clippingAbstraction(
+                std::move(resolutions), std::move(valueBounds.extremeBounds->template copyValues<typename BeliefType::ValueType>()),
+                std::move(storm::storage::BitVector(valueBounds.extremeBounds->isInfinite)));
+            exploration.resumeClippingExploration(
+                info, terminalBeliefCallback, []() { return false; }, propertyInformation.rewardModelName.value(), storm::OptionalRef(clippingAbstraction));
+        } else {
+            ClippingBeliefAbstraction<BeliefType> clippingAbstraction(std::move(resolutions));
+            exploration.resumeClippingExploration(
+                info, terminalBeliefCallback, []() { return false; }, storm::NullRef, storm::OptionalRef(clippingAbstraction));
+        }
+        STORM_LOG_TRACE("Finished clipping phase.");
     } else {
-        exploration.resumeExploration(info, terminalBeliefCallback, terminationCallback, storm::NullRef, abstraction);
+        if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
+            exploration.resumeExploration(info, terminalBeliefCallback, terminationCallback, propertyInformation.rewardModelName.value(), abstraction);
+        } else {
+            exploration.resumeExploration(info, terminalBeliefCallback, terminationCallback, storm::NullRef, abstraction);
+        }
     }
     swExplore.stop();
-    bool earlyExplorationStop = !info.queue.hasNext();
+    bool earlyExplorationStop = info.queue.hasNext();
     if (earlyExplorationStop) {
         STORM_PRINT_AND_LOG("Exploration stopped before all states were explored.\n");
     }
 
     // Second, build the Belief MDP from the exploration information
     storm::utility::Stopwatch swBuild(true);
-    std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> beliefMdp =
-        buildBeliefMdpFromInfo<BeliefType, BeliefMdpValueType, InfoType>(propertyInformation, options, valueBounds, info);
+    auto [beliefMdp, stateToBeliefMap] =
+        buildBeliefMdpFromInfo<PomdpModelType, BeliefType, BeliefMdpValueType, InfoType>(propertyInformation, options, *valueBounds.preprocessingBounds, info);
     swBuild.stop();
     beliefMdp->printModelInformationToStream(std::cout);
 
@@ -225,12 +288,19 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     STORM_LOG_ASSERT(res->isExplicitQuantitativeCheckResult(), "Model checking of belief MDP did not return result of expected type.");
     STORM_LOG_ASSERT(beliefMdp->getInitialStates().getNumberOfSetBits() == 1, "Unexpected number of initial states for belief Mdp.");
     auto const initState = beliefMdp->getInitialStates().getNextSetIndex(0);
+    storm::api::exportSparseModelAsDot(std::dynamic_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(beliefMdp),
+                                       "/Users/bork/Desktop/belief_mdp.dot");
     if (options.generatePolicy) {
-        // TODO: Implement policy extraction
         STORM_LOG_ASSERT(res->asQuantitativeCheckResult<BeliefMdpValueType>().hasScheduler() && options.buildChoiceLabeling,
                          "Model checking of belief MDP did not return a policy.");
-        /*storm::api::exportScheduler(std::static_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(beliefMdp),
-                                    res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>().getScheduler(), "/Users/bork/Desktop/policy.json");*/
+        std::unordered_map<uint64_t, BeliefObservationType> beliefStateObservationMap;
+        for (const auto& [state, beliefId] : stateToBeliefMap) {
+            beliefStateObservationMap[state] = info.discoveredBeliefs.getBeliefFromId(beliefId).observation();
+        }
+        policy::PolicyExtractor<PomdpModelType, typename BeliefType::ValueType, BeliefMdpValueType> policyExtractor(
+            pomdp, *beliefMdp, beliefStateObservationMap, res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>().getScheduler(),
+            propertyInformation.dir == storm::OptimizationDirection::Minimize ? valueBounds.preprocessingBounds->upperSchedulers
+                                                                              : valueBounds.preprocessingBounds->lowerSchedulers);
     }
     return {res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>()[initState], !earlyExplorationStop};
 }
@@ -239,16 +309,22 @@ template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpVa
 std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::checkUnfold(
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-    storm::pomdp::storage::PreprocessingPomdpValueBounds<BeliefMdpValueType> const& valueBounds) {
-    return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType, NoAbstractionType>(env, inputPomdp, propertyInformation,
-                                                                                                                   options, valueBounds);
+    storm::pomdp::storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds) {
+    if (options.useClipping) {
+        return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType, NoAbstractionType,
+                                       ClippingExplorationInformation<BeliefMdpValueType, Belief<BeliefValueType>>>(env, inputPomdp, propertyInformation,
+                                                                                                                    options, valueBounds);
+    } else {
+        return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType, NoAbstractionType>(env, inputPomdp, propertyInformation,
+                                                                                                                       options, valueBounds);
+    }
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
 std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::checkDiscretize(
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
-    storm::pomdp::storage::PreprocessingPomdpValueBounds<BeliefMdpValueType> const& valueBounds) {
+    storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds) {
     auto mode = useDynamic ? FreudenthalTriangulationMode::Dynamic : FreudenthalTriangulationMode::Static;
     FreudenthalTriangulationBeliefAbstraction<Belief<BeliefValueType>> abstraction(storm::utility::convertNumber<BeliefValueType>(resolution), mode);
     return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(env, inputPomdp, propertyInformation, options, valueBounds,
@@ -257,7 +333,10 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
 
 // TODO: Check which instantiations are actually necessary / reasonable.
 template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, double, double>;
-//  template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, storm::RationalNumber, double>;
-//  template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>, double, storm::RationalNumber>;
+template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, storm::RationalNumber, double>;
 template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>, storm::RationalNumber, storm::RationalNumber>;
+template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>, storm::RationalNumber, double>;
+template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<double>, double, storm::RationalNumber>;
+// Currently we don't consider this combination as having rational numbers in models, but floats in beliefs does not really help us
+//  template class BeliefBasedModelChecker<storm::models::sparse::Pomdp<storm::RationalNumber>, double, storm::RationalNumber>;
 }  // namespace storm::pomdp::beliefs

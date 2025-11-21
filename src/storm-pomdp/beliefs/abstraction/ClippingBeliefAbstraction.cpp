@@ -4,12 +4,12 @@
 
 #include <optional>
 
+#include "storm-pomdp/beliefs/storage/BeliefBuilder.h"
+#include "storm-pomdp/beliefs/utility/BeliefNumerics.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/solver/GlpkLpSolver.h"
-#include "storm/solver/LpSolver.h"
 #include "storm/storage/expressions/Expression.h"
 #include "storm/storage/expressions/ExpressionManager.h"
-#include "storm/storage/expressions/Variable.h"
 #include "storm/utility/solver.h"
 
 namespace storm::pomdp::beliefs {
@@ -17,13 +17,24 @@ namespace storm::pomdp::beliefs {
 template<typename BeliefType>
 ClippingBeliefAbstraction<BeliefType>::ClippingBeliefAbstraction(std::vector<uint64_t>&& observationResolutions)
     : observationResolutions(std::forward<std::vector<uint64_t>>(observationResolutions)) {
-    STORM_LOG_ASSERT(std::all_of(observationResolutions.begin(), observationResolutions.end(), [](auto o) { return o > 0; }),
+    STORM_LOG_ASSERT(std::all_of(this->observationResolutions.begin(), this->observationResolutions.end(), [](auto o) { return o > 0; }),
                      "Expected that the resolutions are positive.");
 }
 
 template<typename BeliefType>
-typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbstraction<BeliefType>::clipBeliefToGrid(
-    const BeliefType& belief, uint64_t resolution, const storm::storage::BitVector& isInfinite) {
+ClippingBeliefAbstraction<BeliefType>::ClippingBeliefAbstraction(std::vector<uint64_t>&& observationResolutions,
+                                                                 std::vector<BeliefValueType>&& extremalRewardValues, storm::storage::BitVector&& isInfinite)
+    : observationResolutions(std::forward<std::vector<uint64_t>>(observationResolutions)),
+      extremalRewardValues(std::forward<std::vector<BeliefValueType>>(extremalRewardValues)),
+      isInfinite(std::forward<storm::storage::BitVector>(isInfinite)) {
+    STORM_LOG_ASSERT(std::all_of(this->observationResolutions.begin(), this->observationResolutions.end(), [](auto o) { return o > 0; }),
+                     "Expected that the resolutions are positive.");
+    STORM_LOG_ASSERT(this->isInfinite->size() > 0, "Empty bitvector for infinite values provided.");
+}
+
+template<typename BeliefType>
+typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbstraction<BeliefType>::clipBeliefToGrid(const BeliefType& belief,
+                                                                                                                       uint64_t resolution) {
     if (!lpSolver) {
         lpSolver = storm::utility::solver::getLpSolver<BeliefValueType>("POMDP LP Solver");
     } else {
@@ -44,23 +55,23 @@ typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbs
     // State clipping values
     std::vector<storm::expressions::Expression> deltas;
     uint64_t i = 0;
-    belief.forEach([this, &isInfinite, &deltas, &i](BeliefStateType const& state, BeliefValueType const& beliefValue) {
+    belief.forEach([this, &deltas, &i](BeliefStateType const& state, BeliefValueType const& beliefValue) {
         // This is a quite dirty fix to enable GLPK for the TACAS '22 implementation without substantially changing the implementation for Gurobi.
-        if (typeid(*lpSolver) == typeid(storm::solver::GlpkLpSolver<BeliefValueType>) && !isInfinite.empty()) {
-            if (isInfinite[state]) {
+        /*if (typeid(*lpSolver) == typeid(storm::solver::GlpkLpSolver<BeliefValueType>) && isInfinite) {
+            if ((*isInfinite)[state]) {
                 auto localDelta = lpSolver->addBoundedContinuousVariable("d_" + std::to_string(i), storm::utility::zero<BeliefValueType>(), beliefValue);
                 auto deltaExpr = storm::expressions::Expression(localDelta);
                 deltas.push_back(deltaExpr);
                 lpSolver->addConstraint("state_val_inf_" + std::to_string(i), deltaExpr == lpSolver->getConstant(storm::utility::zero<BeliefValueType>()));
             }
-        } else {
-            BeliefValueType bound = beliefValue;
-            if (!isInfinite.empty()) {
-                bound = isInfinite[state] ? storm::utility::zero<BeliefValueType>() : beliefValue;
-            }
-            auto localDelta = lpSolver->addBoundedContinuousVariable("d_" + std::to_string(i), storm::utility::zero<BeliefValueType>(), bound);
-            deltas.push_back(storm::expressions::Expression(localDelta));
-        }
+        } else {*/
+        BeliefValueType bound = beliefValue;
+        // if (isInfinite) {
+        //     bound = (*isInfinite)[state] ? storm::utility::zero<BeliefValueType>() : beliefValue;
+        // }
+        auto localDelta = lpSolver->addBoundedContinuousVariable("d_" + std::to_string(i), storm::utility::zero<BeliefValueType>(), bound);
+        deltas.push_back(storm::expressions::Expression(localDelta));
+        //}
         ++i;
     });
     lpSolver->update();
@@ -85,6 +96,7 @@ typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbs
         });
         auto candidate = candidateBuilder.build();
         if (candidate == belief) {
+            STORM_LOG_TRACE(belief.toString() << " on clipping grid.");
             // TODO Improve handling of successors which are already on the grid
             return BeliefClipping{false, std::move(candidate), storm::utility::zero<BeliefValueType>(), {}, true};
         } else {
@@ -98,17 +110,12 @@ typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbs
             i = 0;
             belief.forEachCombine(candidate, [&](BeliefStateType const& state, BeliefValueType const& beliefValue, BeliefValueType const& candidateValue) {
                 // Add the constraint to describe the transformation between the state values in the beliefs
-                // d_i
-                storm::expressions::Expression leftSide = deltas[i];
-                storm::expressions::Expression targetValue = lpSolver->getConstant(candidateValue);
-
-                // b(s_i) - b_j(s_i) + D * b_j(s_i) - 1 + a_j
-                storm::expressions::Expression rightSide =
-                    lpSolver->getConstant(beliefValue) - targetValue + storm::expressions::Expression(bigDelta) * targetValue -
-                    lpSolver->getConstant(storm::utility::one<BeliefValueType>()) + storm::expressions::Expression(decisionVar);
-
-                // Add left >= right
-                lpSolver->addConstraint("state_eq_" + std::to_string(i) + "_" + std::to_string(gridCandidates.size() - 1), leftSide >= rightSide);
+                // Add d_i >= b(s_i) - b_j(s_i) + D * b_j(s_i) - 1 + a_j
+                lpSolver->addConstraint("state_eq_" + std::to_string(i) + "_" + std::to_string(gridCandidates.size() - 1),
+                                        deltas.at(i) >= lpSolver->getConstant(beliefValue) - lpSolver->getConstant(candidateValue) +
+                                                            storm::expressions::Expression(bigDelta) * lpSolver->getConstant(candidateValue) -
+                                                            lpSolver->getConstant(storm::utility::one<BeliefValueType>()) +
+                                                            storm::expressions::Expression(decisionVar));
                 ++i;
                 lpSolver->update();
             });
@@ -158,7 +165,7 @@ typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbs
                 break;
             }
         }
-        STORM_LOG_ASSERT(targetBeliefIndex < gridCandidates.size(), "lp optimal but no belief selected");
+        STORM_LOG_ASSERT(targetBeliefIndex < gridCandidates.size(), "LP optimal but no belief selected");
         auto targetBelief = gridCandidates.at(targetBeliefIndex);
         i = 0;
         belief.forEachStateInSupport([this, &i, &deltaValues, &deltaSum](BeliefStateType const& state) {
@@ -190,8 +197,11 @@ typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbs
             }
             optDelta = deltaSum;
         }
+        STORM_LOG_TRACE("Clip " << belief.toString() << " to " << targetBelief.toString() << " with value " << optDelta);
+        return BeliefClipping{true, std::move(targetBelief), optDelta, deltaValues, false};
     }
-    return BeliefClipping{lpSolver->isOptimal(), belief, optDelta, deltaValues, false};
+    STORM_LOG_TRACE("Clipping " << belief.toString() << " not possible. LP not optimal.");
+    return BeliefClipping{false, belief, optDelta, deltaValues, false};
 }
 
 template class ClippingBeliefAbstraction<Belief<double>>;

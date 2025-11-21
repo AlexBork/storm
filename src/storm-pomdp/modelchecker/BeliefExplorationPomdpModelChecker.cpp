@@ -57,7 +57,7 @@ void BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefM
 
     // Compute some initial bounds on the values for each state of the pomdp
     // We work with the Belief MDP value type, so if the POMDP is exact, but the belief MDP is not, we need to convert
-    auto preProcessingMC = PreprocessingPomdpValueBoundsModelChecker<ValueType>(pomdp());
+    auto preProcessingMC = PreprocessingPomdpValueBoundsModelChecker<PomdpModelType>(pomdp());
     auto initialPomdpValueBounds = preProcessingMC.getValueBounds(preProcEnv, formula);
     pomdpValueBounds.trivialPomdpValueBounds = initialPomdpValueBounds;
 
@@ -109,9 +109,10 @@ storage::BeliefExplorationResult<BeliefMDPType> BeliefExplorationPomdpModelCheck
         pomdpValueBounds.fmSchedulerValueList = additionalUnderApproximationBounds;
     }
     uint64_t initialPomdpState = pomdp().getInitialStates().getNextSetIndex(0);
-    storage::BeliefExplorationResult<BeliefMDPType> result(pomdpValueBounds.trivialPomdpValueBounds.getHighestLowerBound(initialPomdpState),
-                                                           pomdpValueBounds.trivialPomdpValueBounds.getSmallestUpperBound(initialPomdpState));
-    STORM_LOG_INFO("Initial value bounds are [" << result.lowerBound << ", " << result.upperBound << "]");
+    storage::BeliefExplorationResult<BeliefMDPType> result(
+        pomdpValueBounds.trivialPomdpValueBounds.template getHighestLowerBound<BeliefMDPType>(initialPomdpState),
+        pomdpValueBounds.trivialPomdpValueBounds.template getSmallestUpperBound<BeliefMDPType>(initialPomdpState));
+    STORM_LOG_INFO("Initial value bounds are [" << *result.lowerBound << ", " << *result.upperBound << "]");
 
     std::optional<std::string> rewardModelName;
     std::set<uint32_t> targetObservations;
@@ -352,11 +353,11 @@ void BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefM
         (min ? computingUpperBound : computingLowerBound) = true;
     }
     if (computingLowerBound && computingUpperBound) {
-        STORM_LOG_INFO("\tObtained result is [" << result.lowerBound << ", " << result.upperBound << "].");
+        STORM_LOG_INFO("\tObtained result is [" << *result.lowerBound << ", " << *result.upperBound << "].");
     } else if (computingLowerBound) {
-        STORM_LOG_INFO("\tObtained result is ≥" << result.lowerBound << ".");
+        STORM_LOG_INFO("\tObtained result is ≥" << *result.lowerBound << ".");
     } else if (computingUpperBound) {
-        STORM_LOG_INFO("\tObtained result is ≤" << result.upperBound << ".");
+        STORM_LOG_INFO("\tObtained result is ≤" << *result.upperBound << ".");
     }
 
     // Start refinement
@@ -436,11 +437,11 @@ void BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefM
                         (min ? computingUpperBound : computingLowerBound) = true;
                     }
                     if (computingLowerBound && computingUpperBound) {
-                        STORM_LOG_INFO("\tCurrent result is [" << result.lowerBound << ", " << result.upperBound << "].");
+                        STORM_LOG_INFO("\tCurrent result is [" << *result.lowerBound << ", " << *result.upperBound << "].");
                     } else if (computingLowerBound) {
-                        STORM_LOG_INFO("\tCurrent result is ≥" << result.lowerBound << ".");
+                        STORM_LOG_INFO("\tCurrent result is ≥" << *result.lowerBound << ".");
                     } else if (computingUpperBound) {
-                        STORM_LOG_INFO("\tCurrent result is ≤" << result.upperBound << ".");
+                        STORM_LOG_INFO("\tCurrent result is ≤" << *result.upperBound << ".");
                     }
                     STORM_LOG_WARN_COND(statistics.refinementSteps.value() < 1000, "Refinement requires  more than 1000 iterations.");
                 }
@@ -659,11 +660,11 @@ void BeliefExplorationPomdpModelChecker<PomdpModelType, BeliefValueType, BeliefM
                         (min ? computingUpperBound : computingLowerBound) = true;
                     }
                     if (computingLowerBound && computingUpperBound) {
-                        STORM_LOG_INFO("\tCurrent result is [" << interactiveResult.lowerBound << ", " << interactiveResult.upperBound << "].");
+                        STORM_LOG_INFO("\tCurrent result is [" << *interactiveResult.lowerBound << ", " << *interactiveResult.upperBound << "].");
                     } else if (computingLowerBound) {
-                        STORM_LOG_INFO("\tCurrent result is ≥" << interactiveResult.lowerBound << ".");
+                        STORM_LOG_INFO("\tCurrent result is ≥" << *interactiveResult.lowerBound << ".");
                     } else if (computingUpperBound) {
-                        STORM_LOG_INFO("\tCurrent result is ≤" << interactiveResult.upperBound << ".");
+                        STORM_LOG_INFO("\tCurrent result is ≤" << *interactiveResult.upperBound << ".");
                     }
                 }
             }

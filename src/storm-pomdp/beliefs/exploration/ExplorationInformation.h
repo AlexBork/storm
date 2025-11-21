@@ -20,7 +20,7 @@ struct ExplorationInformation {
     [[nodiscard]] std::unordered_set<BeliefId> getFrontierBeliefs() const {
         std::unordered_set<BeliefId> resFrontierBeliefs;
         for (uint64_t id = 0; id < discoveredBeliefs.getNumberOfBeliefIds(); id++) {
-            if (exploredBeliefs.count(id) == 0 && terminalBeliefValues.count(id) == 0) {
+            if (!exploredBeliefs.contains(id) && !terminalBeliefValues.contains(id)) {
                 resFrontierBeliefs.insert(id);
             }
         }

@@ -39,5 +39,7 @@ template class BeliefExplorationMatrix<double>;
 template class BeliefExplorationMatrix<double, std::vector<double>>;
 template class BeliefExplorationMatrix<storm::RationalNumber>;
 template class BeliefExplorationMatrix<storm::RationalNumber, std::vector<storm::RationalNumber>>;
+template class BeliefExplorationMatrix<double, std::optional<double>, std::optional<double>>;
+template class BeliefExplorationMatrix<storm::RationalNumber, std::optional<storm::RationalNumber>, std::optional<storm::RationalNumber>>;
 
 }  // namespace storm::pomdp::beliefs
