@@ -5,9 +5,9 @@
 
 #include "storm-pomdp/beliefs/exploration/ExplorationInformation.h"
 #include "storm-pomdp/beliefs/verification/PropertyInformation.h"
+#include "storm/exceptions/NotImplementedException.h"
 #include "storm/logic/Formulas.h"
 #include "storm/models/sparse/Mdp.h"
-#include "storm/models/sparse/StandardRewardModel.h"
 
 namespace storm::pomdp::beliefs {
 
@@ -29,7 +29,9 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
 std::pair<std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
-    PropertyInformation const& propertyInformation, std::function<BeliefMdpValueType(BeliefType const&)> const& computeCutOffValue);
+    PropertyInformation const& propertyInformation, std::function<BeliefMdpValueType(BeliefType const&)> const& computeCutOffValue) {
+    STORM_LOG_THROW(false, storm::exceptions::NotImplementedException, "building belief MDPs with implicit cut-offs is currently disabled.");
+}
 
 /**
  * Builds a belief MDP from the given exploration information and property information.
@@ -45,6 +47,12 @@ std::pair<std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>>, std::
  */
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
 std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdp(
+    ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
+    PropertyInformation const& propertyInformation,
+    std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> const& computeCutOffValueMap);
+
+template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
+std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
     ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
     PropertyInformation const& propertyInformation,
     std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> const& computeCutOffValueMap);

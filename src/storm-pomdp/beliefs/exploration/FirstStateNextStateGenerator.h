@@ -185,6 +185,7 @@ struct NextStateGeneratorHandle {
                     if (pomdp.getObservation(pomdpTransition.getColumn()) == (successorObsValue.first % pomdp.getNrObservations())) {
                         BeliefValueType const prob =
                             beliefValue * storm::utility::convertNumber<BeliefValueType>(pomdpTransition.getValue()) / successorObsValue.second;
+                        STORM_LOG_ASSERT(prob > storm::utility::zero<BeliefValueType>(), "Invalid belief probability " << prob << ".");
                         builder.addValue(pomdpTransition.getColumn(), prob);
                     }
                 }

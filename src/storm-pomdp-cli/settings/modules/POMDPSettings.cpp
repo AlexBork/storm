@@ -27,6 +27,8 @@ const std::string memoryPatternOption = "memorypattern";
 std::vector<std::string> memoryPatterns = {"trivial", "fixedcounter", "selectivecounter", "ring", "fixedring", "settablebits", "full"};
 const std::string checkFullyObservableOption = "check-fully-observable";
 const std::string isQualitativeOption = "qualitative-analysis";
+const std::string isBoundedToUnboundedReachabilityTransformationOption = "unfold-reward-bound";
+const std::string isRewardObservableOption = "reward-aware";
 
 POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
     this->addOption(storm::settings::OptionBuilder(moduleName, noCanonicOption, false,
@@ -75,6 +77,17 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
     this->addOption(
         storm::settings::OptionBuilder(moduleName, checkFullyObservableOption, false, "Performs standard model checking on the underlying MDP").build());
     this->addOption(storm::settings::OptionBuilder(moduleName, isQualitativeOption, false, "Sets the option qualitative analysis").build());
+    this->addOption(storm::settings::OptionBuilder(
+                        moduleName, isBoundedToUnboundedReachabilityTransformationOption, false,
+                        "Sets the option that reward bounded reachability properties are transformed to an unbounded problem on an unfolded POMDP.")
+                        .build());
+    this->addOption(storm::settings::OptionBuilder(moduleName, isRewardObservableOption, false,
+                                                   "Sets the option that rewards are observable for bounded reachability properties.")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument("levelwidths", "comma separated list of width of reward levels.")
+                                         .setDefaultValueString("")
+                                         .makeOptional()
+                                         .build())
+                        .build());
 }
 
 bool POMDPSettings::isNoCanonicSet() const {
@@ -135,6 +148,25 @@ bool POMDPSettings::isCheckFullyObservableSet() const {
 
 bool POMDPSettings::isQualitativeAnalysisSet() const {
     return this->getOption(isQualitativeOption).getHasOptionBeenSet();
+}
+
+bool POMDPSettings::isBoundedToUnboundedReachabilityTransformationSet() const {
+    return this->getOption(isBoundedToUnboundedReachabilityTransformationOption).getHasOptionBeenSet();
+}
+
+bool POMDPSettings::isRewardObservableSet() const {
+    return this->getOption(isRewardObservableOption).getHasOptionBeenSet();
+}
+
+std::vector<uint64_t> POMDPSettings::getLevelWidthForBoundedReachability() const {
+    auto const input = this->getOption(isRewardObservableOption).getArgumentByName("levelwidths").getValueAsString();
+    if (input.empty()) {
+        return {};
+    }
+    // split the string by comma
+    auto result = input | std::ranges::views::split(',') |
+                  std::ranges::views::transform([](auto&& r) -> uint64_t { return std::stoull(std::string(r.begin(), r.end())); });
+    return {result.begin(), result.end()};
 }
 
 uint64_t POMDPSettings::getMemoryBound() const {

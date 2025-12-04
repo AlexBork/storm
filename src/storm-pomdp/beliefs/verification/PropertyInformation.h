@@ -16,10 +16,11 @@ struct RewardBound {
 };
 
 struct PropertyInformation {
-    enum class Kind { ReachabilityProbability, ExpectedTotalReachabilityReward };
+    enum class Kind { ReachabilityProbability, ExpectedTotalReachabilityReward, RewardBoundedReachabilityProbability };
     Kind kind;
     std::set<BeliefObservationType> targetObservations;
     std::optional<std::string> rewardModelName;
     storm::OptimizationDirection dir;
+    std::vector<RewardBound> rewardBounds;
 };
 }  // namespace storm::pomdp::beliefs

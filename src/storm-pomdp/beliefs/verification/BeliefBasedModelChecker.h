@@ -30,6 +30,17 @@ class BeliefBasedModelChecker {
                                                         uint64_t resolution, bool useDynamic,
                                                         storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
 
+    std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                                               storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+                                                               storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
+                                                               std::vector<std::string> const& relevantRewardModelNames = {});
+
+    std::pair<BeliefMdpValueType, bool> checkRewardAwareDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                                                   storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+                                                                   uint64_t resolution, bool useDynamic,
+                                                                   storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
+                                                                   std::vector<std::string> const& relevantRewardModelNames = {});
+
    private:
     PomdpModelType const& inputPomdp;
     // Optional version of the input POMDP used for computing exact beliefs if the input POMDP uses floating point numbers.

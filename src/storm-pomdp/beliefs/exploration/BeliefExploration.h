@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <optional>
-#include <set>
 
 #include "storm-pomdp/beliefs/exploration/ExplorationInformation.h"
 
@@ -17,6 +16,9 @@ namespace storm::pomdp::beliefs {
 
 template<typename BeliefType>
 class FreudenthalTriangulationBeliefAbstraction;
+
+template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
+class RewardBoundedBeliefSplitter;
 
 template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
 struct StandardDiscoverCallback {
@@ -73,6 +75,22 @@ struct ClippingDiscoverCallback {
     }
 };
 
+template<typename BeliefMdpValueType, typename PomdpType, typename BeliefType>
+struct RewardAwareDiscoverCallback {
+    RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info;
+
+    RewardAwareDiscoverCallback(RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info) : info(info) {
+        // Intentionally left empty
+    }
+    void operator()(BeliefType&& bel, typename BeliefType::ValueType&& val, std::vector<BeliefMdpValueType> const& rewards) {
+        auto const belId = info.discoveredBeliefs.getIdOrAddBelief(std::move(bel));
+        if (info.exploredBeliefs.count(belId) == 0u && info.terminalBeliefValues.count(belId) == 0u) {
+            info.queue.push(belId);
+        }
+        info.matrix.transitions.push_back({storm::utility::convertNumber<BeliefMdpValueType>(val), belId, rewards});
+    }
+};
+
 /**
  *  Class to perform belief exploration. Heavily templated to allow for different belief, value, abstraction, etc. types.
  *  Therefore, implementations are in the header file.
@@ -111,6 +129,21 @@ class BeliefExploration {
                                terminationCallback);
         } else {
             performExploration(info, firstStateNextStateGenerator.getHandle(discoverCallback), terminalBeliefCallback, terminationCallback);
+        }
+    }
+
+    template<typename AbstractionType>
+    void resumeRewardAwareExploration(RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info,
+                                      TerminalBeliefCallback const& terminalBeliefCallback, TerminationCallback const& terminationCallback,
+                                      RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpType, BeliefType> rewardSplitter,
+                                      storm::OptionalRef<AbstractionType> abstraction) {
+        RewardAwareDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
+        if (abstraction) {
+            performExploration(info, firstStateNextStateGenerator.getPrePostAbstractionHandle(rewardSplitter, abstraction.value(), discoverCallback),
+                               terminalBeliefCallback, terminationCallback);
+        } else {
+            performExploration(info, firstStateNextStateGenerator.getPreAbstractionHandle(rewardSplitter, discoverCallback), terminalBeliefCallback,
+                               terminationCallback);
         }
     }
 
