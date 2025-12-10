@@ -354,6 +354,15 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                             ++nextStateId;
                         }
                         transitionBuilder.addNextValue(choice, insertIterator->second, entry.probability);
+                        if constexpr (extraDataCompatibleWithRewardAwareness) {
+                            if (isRewBndReachProb) {
+                                for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
+                                    if (!storm::utility::isZero(entry.data[i])) {
+                                        transitionRewardBuilderVector.at(i).addNextValue(choice, insertIterator->second, entry.data[i]);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -587,6 +596,15 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                             ++nextStateId;
                         }
                         transitionBuilder.addNextValue(choice, insertIterator->second, entry.probability);
+                        if constexpr (extraDataCompatibleWithRewardAwareness) {
+                            if (isRewBndReachProb) {
+                                for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
+                                    if (!storm::utility::isZero(entry.data[i])) {
+                                        transitionRewardBuilderVector.at(i).addNextValue(choice, insertIterator->second, entry.data[i]);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
