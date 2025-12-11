@@ -87,6 +87,11 @@ struct RewardAwareDiscoverCallback {
         if (info.exploredBeliefs.count(belId) == 0u && info.terminalBeliefValues.count(belId) == 0u) {
             info.queue.push(belId);
         }
+        STORM_PRINT("To " << belId << "-- " << val << " -- ");
+        for (auto const& r : rewards) {
+            STORM_PRINT(r << " ");
+        }
+        STORM_PRINT("\n");
         info.matrix.transitions.push_back({storm::utility::convertNumber<BeliefMdpValueType>(val), belId, rewards});
     }
 };
