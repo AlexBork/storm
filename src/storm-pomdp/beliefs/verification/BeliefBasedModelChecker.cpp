@@ -1,18 +1,15 @@
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
 
-#include <memory>
-#include <storm/api/export.h>
-
+#include "storm-pomdp/beliefs/abstraction/ClippingBeliefAbstraction.h"
 #include "storm-pomdp/beliefs/abstraction/FreudenthalTriangulationBeliefAbstraction.h"
 #include "storm-pomdp/beliefs/abstraction/RewardBoundedBeliefSplitter.h"
 #include "storm-pomdp/beliefs/exploration/BeliefExploration.h"
 #include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
-#include "storm-pomdp/beliefs/storage/Belief.h"
-
-#include "storm-pomdp/beliefs/abstraction/ClippingBeliefAbstraction.h"
 #include "storm-pomdp/beliefs/policy/PolicyExtractor.h"
+#include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelCheckerOptions.h"
 #include "storm/api/verification.h"
+#include "storm/modelchecker/results/ExplicitQuantitativeCheckResult.h"
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/transformer/GoalStateMerger.h"
 #include "storm/transformer/TransitionToActionRewardTransformer.h"
@@ -206,8 +203,7 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                 }
                 return result;
             };
-        // return buildBeliefMdp(info, propertyInformation, computeCutOffValueMap);
-        return buildBeliefMdpOld(info, propertyInformation, computeCutOffValueMap);
+        return buildBeliefMdp(info, propertyInformation, computeCutOffValueMap);
     }
 }
 
@@ -300,8 +296,6 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     STORM_LOG_ASSERT(res->isExplicitQuantitativeCheckResult(), "Model checking of belief MDP did not return result of expected type.");
     STORM_LOG_ASSERT(beliefMdp->getInitialStates().getNumberOfSetBits() == 1, "Unexpected number of initial states for belief Mdp.");
     auto const initState = beliefMdp->getInitialStates().getNextSetIndex(0);
-    storm::api::exportSparseModelAsDot(std::dynamic_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(beliefMdp),
-                                       "/Users/bork/Desktop/belief_mdp.dot");
     if (options.generatePolicy) {
         STORM_LOG_ASSERT(res->asQuantitativeCheckResult<BeliefMdpValueType>().hasScheduler() && options.buildChoiceLabeling,
                          "Model checking of belief MDP did not return a policy.");
@@ -334,7 +328,7 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
     storm::utility::Stopwatch swExplore(true);
     BeliefExplorationType exploration(pomdp);
     using InfoType = RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>;
-    auto info = exploration.template initializeExploration<InfoType>(pomdp.getNrObservations());
+    auto info = exploration.template initializeExploration<InfoType>(pomdp.getNrObservations(), options.explorationQueueOrder);
 
     // Determine terminationCallback based on options
     typename BeliefExplorationType::TerminationCallback terminationCallback =
@@ -365,8 +359,6 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
     STORM_PRINT_AND_LOG("Analyzing property '" << *formula << "' on the belief MDP...\n");
     storm::utility::Stopwatch swCheck(true);
     std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> processedMdp = beliefMdp;
-    storm::api::exportSparseModelAsDot(std::dynamic_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(processedMdp),
-                                       "/Users/bork/Desktop/belief_mdp_before_transform.dot");
     if (propertyInformation.kind == PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
         std::vector<std::string> rewardModelNames;
         for (auto const& bnd : propertyInformation.rewardBounds) {
@@ -392,8 +384,6 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
         auto mergingResult = storm::transformer::GoalStateMerger(*processedMdp)
                                  .mergeTargetAndSinkStates(probGreaterZeroStates, ~probGreaterZeroStates, ~allStates, rewardModelNames);
         processedMdp = mergingResult.model;
-        storm::api::exportSparseModelAsDot(std::dynamic_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(processedMdp),
-                                           "/Users/bork/Desktop/belief_mdp_after_transform.dot");
         STORM_PRINT_AND_LOG("Merging of sink states resulted in a model with " << processedMdp->getNumberOfStates() << " states.\n");
     }
     storm::modelchecker::CheckTask<storm::logic::Formula, BeliefMdpValueType> task(*formula, true);
@@ -406,7 +396,6 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
     STORM_LOG_ASSERT(res->isExplicitQuantitativeCheckResult(), "Model checking of belief MDP did not return result of expected type.");
     STORM_LOG_ASSERT(processedMdp->getInitialStates().getNumberOfSetBits() == 1, "Unexpected number of initial states for (processed) belief Mdp.");
     auto const initState = processedMdp->getInitialStates().getNextSetIndex(0);
-    STORM_PRINT("RES: " << res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>()[initState] << "\n");
     return {res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>()[initState], !earlyExplorationStop};
 }
 

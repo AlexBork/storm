@@ -494,205 +494,6 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     return std::make_pair(std::make_shared<storm::models::sparse::Mdp<BeliefMdpValueType>>(std::move(components)), std::move(stateToBeliefMap));
 }
 
-template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
-std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...> const& explorationInformation,
-    PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> const& computeCutOffValueMap) {
-    bool const isReachProb = propertyInformation.kind == PropertyInformation::Kind::ReachabilityProbability;
-    bool const isTotRew = propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward;
-    bool const isRewBndReachProb = propertyInformation.kind == PropertyInformation::Kind::RewardBoundedReachabilityProbability;
-    STORM_LOG_ASSERT(isReachProb || isTotRew || isRewBndReachProb, "Unexpected kind of property.");
-
-    bool constexpr extraDataCompatibleWithRewardAwareness =
-        sizeof...(ExtraTransitionData) == 1 && (std::is_same_v<std::vector<BeliefMdpValueType>, ExtraTransitionData> || ...);
-
-    // First gather all cut-off information
-    uint64_t nrCutOffChoices = 0ull;
-    std::unordered_map<BeliefId, std::unordered_map<std::string, BeliefMdpValueType>> cutOffInformationMap;
-    for (auto const& frontierBeliefId : explorationInformation.getFrontierBeliefs()) {
-        auto const& frontierBelief = explorationInformation.discoveredBeliefs.getBeliefFromId(frontierBeliefId);
-        cutOffInformationMap[frontierBeliefId] = computeCutOffValueMap(frontierBelief);
-        nrCutOffChoices += cutOffInformationMap[frontierBeliefId].size();
-    }
-
-    // (unbounded) reachability probabilities get a dedicated target state as an extra state
-    // This is not done for reward-bounded reachability probabilities because target states are not terminal for those (e.g. because of lower reward bounds)
-    uint64_t const numBottomTargetStates = isReachProb ? 2ull : 1ull;
-    uint64_t const numExtraStates = numBottomTargetStates + explorationInformation.getFrontierBeliefs().size();
-    uint64_t const numStates = explorationInformation.matrix.groups() + numExtraStates;
-    uint64_t const numChoices = explorationInformation.matrix.rows() + numBottomTargetStates + nrCutOffChoices;
-    uint64_t const targetState = numStates - (isReachProb ? 2ull : 1ull);
-    uint64_t const bottomState = numStates - 1;
-
-    std::vector<BeliefMdpValueType> actionRewards;
-    if (isTotRew) {
-        actionRewards.reserve(numChoices);
-        actionRewards.insert(actionRewards.end(), explorationInformation.actionRewards.begin(), explorationInformation.actionRewards.end());
-        // Insert 0 for all cut-off choices and bottom state
-        actionRewards.insert(actionRewards.end(), nrCutOffChoices + 1ull, storm::utility::zero<BeliefMdpValueType>());
-        STORM_LOG_ASSERT(numChoices == actionRewards.size(),
-                         "Unexpected size of action rewards: Expected " << numChoices << " got " << actionRewards.size() << ".");
-    }
-
-    std::unordered_map<BeliefId, uint64_t> frontierBeliefToStateMap;
-    std::unordered_map<uint64_t, BeliefId> stateToFrontierBeliefMap;
-    uint64_t nextStateId = numStates - numExtraStates;
-
-    std::vector<storm::storage::SparseMatrixBuilder<BeliefMdpValueType>> transitionRewardBuilderVector;
-
-    if constexpr (extraDataCompatibleWithRewardAwareness) {
-        if (isRewBndReachProb) {
-            for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
-                transitionRewardBuilderVector.emplace_back(numChoices, numStates, 0, true, true, numStates);
-            }
-        }
-    }
-
-    storm::storage::SparseMatrixBuilder<BeliefMdpValueType> transitionBuilder(numChoices, numStates, 0, true, true, numStates);
-    // Treat explored beliefs
-    for (uint64_t state = 0; state < numStates - numExtraStates; ++state) {
-        uint64_t choice = explorationInformation.matrix.rowGroupIndices[state];
-        transitionBuilder.newRowGroup(choice);
-        for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
-            transitionRewardBuilder.newRowGroup(choice);
-        }
-        for (uint64_t const groupEnd = explorationInformation.matrix.rowGroupIndices[state + 1]; choice < groupEnd; ++choice) {
-            auto probabilityToBottom = storm::utility::zero<BeliefMdpValueType>();
-            auto probabilityToTarget = storm::utility::zero<BeliefMdpValueType>();
-            for (uint64_t entryIndex = explorationInformation.matrix.rowIndications[choice];
-                 entryIndex < explorationInformation.matrix.rowIndications[choice + 1]; ++entryIndex) {
-                auto const& entry = explorationInformation.matrix.transitions[entryIndex];
-                if (auto explIt = explorationInformation.exploredBeliefs.find(entry.targetBelief); explIt != explorationInformation.exploredBeliefs.end()) {
-                    // Transition to explored belief
-                    transitionBuilder.addNextValue(choice, explIt->second, entry.probability);
-                    if constexpr (extraDataCompatibleWithRewardAwareness) {
-                        if (isRewBndReachProb) {
-                            for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
-                                if (!storm::utility::isZero(entry.data[i])) {
-                                    transitionRewardBuilderVector.at(i).addNextValue(choice, explIt->second, entry.data[i]);
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Transition to unexplored belief (either terminal or cut-off)
-                    BeliefMdpValueType successorValue;
-                    if (auto terminalIt = explorationInformation.terminalBeliefValues.find(entry.targetBelief);
-                        terminalIt != explorationInformation.terminalBeliefValues.end()) {
-                        successorValue = entry.probability * terminalIt->second;  // terminal value determined during exploration
-                        if (isReachProb) {
-                            probabilityToTarget += successorValue;
-                            probabilityToBottom += entry.probability - successorValue;
-                        } else {
-                            probabilityToBottom += entry.probability;
-                            actionRewards[choice] += successorValue;
-                        }
-                    } else {
-                        // Transition to frontier belief
-                        auto [insertIterator, inserted] = frontierBeliefToStateMap.insert({entry.targetBelief, nextStateId});
-                        if (inserted) {
-                            stateToFrontierBeliefMap[nextStateId] = entry.targetBelief;
-                            ++nextStateId;
-                        }
-                        transitionBuilder.addNextValue(choice, insertIterator->second, entry.probability);
-                        if constexpr (extraDataCompatibleWithRewardAwareness) {
-                            if (isRewBndReachProb) {
-                                for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
-                                    if (!storm::utility::isZero(entry.data[i])) {
-                                        transitionRewardBuilderVector.at(i).addNextValue(choice, insertIterator->second, entry.data[i]);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if (isReachProb && !storm::utility::isZero(probabilityToTarget)) {
-                transitionBuilder.addNextValue(choice, targetState, probabilityToTarget);
-            }
-            if (!storm::utility::isZero(probabilityToBottom)) {
-                transitionBuilder.addNextValue(choice, bottomState, probabilityToBottom);
-            }
-        }
-    }
-    // Treat frontier beliefs
-    uint64_t choice = explorationInformation.matrix.rows();
-    for (uint64_t state = numStates - numExtraStates; state < numStates - numBottomTargetStates; ++state) {
-        transitionBuilder.newRowGroup(choice);
-        for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
-            transitionRewardBuilder.newRowGroup(choice);
-        }
-        std::unordered_map<std::string, BeliefMdpValueType> cutOffInformationForBelief = cutOffInformationMap.at(stateToFrontierBeliefMap.at(state));
-        for (auto const& entry : cutOffInformationForBelief) {
-            if (isReachProb) {
-                transitionBuilder.addNextValue(choice, targetState, entry.second);
-                transitionBuilder.addNextValue(choice, bottomState, storm::utility::one<BeliefMdpValueType>() - entry.second);
-            } else {
-                transitionBuilder.addNextValue(choice, bottomState, storm::utility::one<BeliefMdpValueType>());
-                if (isTotRew) {
-                    actionRewards[choice] += entry.second;
-                }
-            }
-            // TODO add labeling information
-            ++choice;
-        }
-    }
-
-    // Treat extra states
-    if (isReachProb) {
-        transitionBuilder.newRowGroup(numChoices - 2);
-        transitionBuilder.addNextValue(numChoices - 2, targetState, storm::utility::one<BeliefMdpValueType>());
-    }
-    transitionBuilder.newRowGroup(numChoices - 1);
-    transitionBuilder.addNextValue(numChoices - 1, bottomState, storm::utility::one<BeliefMdpValueType>());
-    for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
-        transitionRewardBuilder.newRowGroup(numChoices - 1);
-    }
-
-    storm::models::sparse::StateLabeling stateLabeling(numStates);
-    stateLabeling.addLabel("bottom");
-    stateLabeling.addLabelToState("bottom", bottomState);
-    stateLabeling.addLabel("init");
-    stateLabeling.addLabelToState("init", explorationInformation.exploredBeliefs.at(explorationInformation.initialBeliefId));
-
-    if (isReachProb) {
-        stateLabeling.addLabel("target");
-        stateLabeling.addLabelToState("target", targetState);
-    } else if (isRewBndReachProb) {
-        stateLabeling.addLabel("target");
-        for (auto const& [belId, state] : explorationInformation.exploredBeliefs) {
-            if (propertyInformation.targetObservations.count(explorationInformation.discoveredBeliefs.getBeliefFromId(belId).observation() %
-                                                             explorationInformation.nrObservationsInPomdp) > 0) {
-                stateLabeling.addLabelToState("target", state);
-            }
-        }
-        for (auto const& belId : explorationInformation.getFrontierBeliefs()) {
-            if (propertyInformation.targetObservations.count(explorationInformation.discoveredBeliefs.getBeliefFromId(belId).observation() %
-                                                             explorationInformation.nrObservationsInPomdp) > 0) {
-                stateLabeling.addLabelToState("target", frontierBeliefToStateMap.at(belId));
-            }
-        }
-    }
-    storm::storage::sparse::ModelComponents<BeliefMdpValueType> components(transitionBuilder.build(), std::move(stateLabeling));
-
-    if (isTotRew) {
-        storm::models::sparse::StandardRewardModel<BeliefMdpValueType> rewardModel(std::nullopt, std::move(actionRewards));
-        components.rewardModels.emplace(propertyInformation.rewardModelName.value(), std::move(rewardModel));
-    } else if (isRewBndReachProb) {
-        uint64_t i = 0ul;
-        for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
-            storm::models::sparse::StandardRewardModel<BeliefMdpValueType> rewardModel(std::nullopt, std::nullopt, transitionRewardBuilder.build());
-            components.rewardModels.emplace(propertyInformation.rewardBounds.at(i).rewardModelName, std::move(rewardModel));
-            ++i;
-        }
-    }
-
-    std::unordered_map<uint64_t, BeliefId> stateToBeliefMap;
-
-    return std::make_pair(std::make_shared<storm::models::sparse::Mdp<BeliefMdpValueType>>(std::move(components)), std::move(stateToBeliefMap));
-}
-
 /*template std::pair<std::shared_ptr<storm::models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
     std::function<double(Belief<double> const&)> const& computeCutOffValue);
@@ -709,7 +510,26 @@ template std::pair<std::shared_ptr<storm::models::sparse::Mdp<double>>, std::uno
 template std::pair<std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>>
 buildBeliefMdpWithImplicitCutoffs(
     ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValue);*/
+    std::function<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValue);
+
+template std::pair<std::shared_ptr<storm::models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpWithImplicitCutoffs(
+    ClippingExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
+    std::function<double(Belief<double> const&)> const& computeCutOffValue);
+
+template std::pair<std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>>
+buildBeliefMdpWithImplicitCutoffs(ClippingExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation,
+                                  PropertyInformation const& propertyInformation,
+                                  std::function<storm::RationalNumber(Belief<double> const&)> const& computeCutOffValue);
+
+template std::pair<std::shared_ptr<storm::models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpWithImplicitCutoffs(
+    ClippingExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
+    std::function<double(Belief<storm::RationalNumber> const&)> const& computeCutOffValue);
+
+template std::pair<std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>>
+buildBeliefMdpWithImplicitCutoffs(ClippingExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation,
+                                  PropertyInformation const& propertyInformation,
+                                  std::function<storm::RationalNumber(Belief<storm::RationalNumber> const&)> const& computeCutOffValue);
+*/
 
 template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdp(
     ExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
@@ -727,24 +547,6 @@ template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, 
     ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
     std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
 
-/*template std::pair<std::shared_ptr<storm::models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpWithImplicitCutoffs(
-    ClippingExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<double(Belief<double> const&)> const& computeCutOffValue);
-
-template std::pair<std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>>
-buildBeliefMdpWithImplicitCutoffs(ClippingExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation,
-                                  PropertyInformation const& propertyInformation,
-                                  std::function<storm::RationalNumber(Belief<double> const&)> const& computeCutOffValue);
-
-template std::pair<std::shared_ptr<storm::models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpWithImplicitCutoffs(
-    ClippingExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<double(Belief<storm::RationalNumber> const&)> const& computeCutOffValue);
-
-template std::pair<std::shared_ptr<storm::models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>>
-buildBeliefMdpWithImplicitCutoffs(ClippingExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation,
-                                  PropertyInformation const& propertyInformation,
-                                  std::function<storm::RationalNumber(Belief<storm::RationalNumber> const&)> const& computeCutOffValue);*/
-
 template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdp(
     ClippingExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
     std::function<std::unordered_map<std::string, double>(Belief<double> const&)> const& computeCutOffValueMap);
@@ -778,56 +580,4 @@ template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, 
     RewardAwareExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation,
     PropertyInformation const& propertyInformation,
     std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<double> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>>>, std::unordered_map<uint64_t, BeliefId>>
-buildBeliefMdpOld(
-    ExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, __gmp_expr<__mpq_struct[1], __mpq_struct[1]>>(Belief<double> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ClippingExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<double> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ClippingExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<double> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ClippingExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    ClippingExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation,
-    PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    RewardAwareExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<double> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    RewardAwareExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<double> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    RewardAwareExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
-
-template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpOld(
-    RewardAwareExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation,
-    PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
-
 }  // namespace storm::pomdp::beliefs
