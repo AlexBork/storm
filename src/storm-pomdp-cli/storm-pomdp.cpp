@@ -1,5 +1,8 @@
-#include "storm/utility/initialize.h"
+#include <typeinfo>
 
+#include "storm-cli-utilities/cli.h"
+#include "storm-cli-utilities/model-handling.h"
+#include "storm-pomdp-cli/settings/PomdpSettings.h"
 #include "storm-pomdp-cli/settings/modules/BeliefExplorationSettings.h"
 #include "storm-pomdp-cli/settings/modules/POMDPSettings.h"
 #include "storm-pomdp-cli/settings/modules/QualitativePOMDPAnalysisSettings.h"
@@ -32,17 +35,17 @@
 #include "storm-pomdp/transformer/PomdpMemoryUnfolder.h"
 #include "storm-pomdp/transformer/RewardBoundUnfolder.h"
 #include "storm-pomdp/transformer/ToStateBasedObservationTransformer.h"
+#include "storm/analysis/GraphConditions.h"
 #include "storm/api/storm.h"
+#include "storm/exceptions/NotSupportedException.h"
+#include "storm/exceptions/UnexpectedException.h"
 #include "storm/modelchecker/results/ExplicitQualitativeCheckResult.h"
 #include "storm/transformer/SparseModelValueTypeTransformer.h"
+#include "storm/settings/modules/DebugSettings.h"
+#include "storm/settings/modules/GeneralSettings.h"
 #include "storm/utility/NumberTraits.h"
 #include "storm/utility/SignalHandler.h"
 #include "storm/utility/Stopwatch.h"
-
-#include "storm/exceptions/NotSupportedException.h"
-#include "storm/exceptions/UnexpectedException.h"
-
-#include <typeinfo>
 
 namespace storm {
 namespace pomdp {
@@ -769,13 +772,13 @@ void processOptions() {
  * @return Return code, 0 if successfull, not 0 otherwise.
  */
 int main(const int argc, const char** argv) {
-    // try {
-    return storm::cli::process("Storm-POMDP", "storm-pomdp", storm::settings::initializePomdpSettings, storm::pomdp::cli::processOptions, argc, argv);
-    // } catch (storm::exceptions::BaseException const &exception) {
-    //    STORM_LOG_ERROR("An exception caused Storm-pomdp to terminate. The message of the exception is: " << exception.what());
-    //    return 1;
-    //} catch (std::exception const &exception) {
-    //    STORM_LOG_ERROR("An unexpected exception occurred and caused Storm-pomdp to terminate. The message of this exception is: " << exception.what());
-    //    return 2;
-    //}
+    try {
+        return storm::cli::process("Storm-POMDP", "storm-pomdp", storm::settings::initializePomdpSettings, storm::pomdp::cli::processOptions, argc, argv);
+    } catch (storm::exceptions::BaseException const& exception) {
+        STORM_LOG_ERROR("An exception caused Storm-pomdp to terminate. The message of the exception is: " << exception.what());
+        return 1;
+    } catch (std::exception const& exception) {
+        STORM_LOG_ERROR("An unexpected exception occurred and caused Storm-pomdp to terminate. The message of this exception is: " << exception.what());
+        return 2;
+    }
 }
