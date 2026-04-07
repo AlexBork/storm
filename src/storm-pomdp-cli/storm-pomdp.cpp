@@ -20,6 +20,7 @@
 #include "storm-pomdp/analysis/JaniBeliefSupportMdpGenerator.h"
 #include "storm-pomdp/analysis/OneShotPolicySearch.h"
 #include "storm-pomdp/analysis/QualitativeAnalysisOnGraphs.h"
+#include "storm-pomdp/analysis/RewardAwarePomdpDetection.h"
 #include "storm-pomdp/analysis/UniqueObservationStates.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
@@ -30,19 +31,16 @@
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
 #include "storm-pomdp/transformer/GlobalPomdpMecChoiceEliminator.h"
 #include "storm-pomdp/transformer/KnownProbabilityTransformer.h"
-#include "storm-pomdp/transformer/MakePOMDPCanonic.h"
 #include "storm-pomdp/transformer/MakeStateSetObservationClosed.h"
 #include "storm-pomdp/transformer/PomdpMemoryUnfolder.h"
 #include "storm-pomdp/transformer/RewardBoundUnfolder.h"
 #include "storm-pomdp/transformer/ToStateBasedObservationTransformer.h"
-#include "storm/analysis/GraphConditions.h"
 #include "storm/api/storm.h"
 #include "storm/exceptions/NotSupportedException.h"
 #include "storm/exceptions/UnexpectedException.h"
 #include "storm/modelchecker/results/ExplicitQualitativeCheckResult.h"
+#include "storm/transformer/MakePOMDPCanonic.h"
 #include "storm/transformer/SparseModelValueTypeTransformer.h"
-#include "storm/settings/modules/DebugSettings.h"
-#include "storm/settings/modules/GeneralSettings.h"
 #include "storm/utility/NumberTraits.h"
 #include "storm/utility/SignalHandler.h"
 #include "storm/utility/Stopwatch.h"
@@ -327,6 +325,12 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     if (storm::pomdp::detectFiniteBeliefMdp(*preprocessedPomdpPtr, optionalTargetStates)) {
         STORM_LOG_INFO("Detected that the belief MDP is finite.");
     }
+
+    /*if (storm::pomdp::analysis::detectRewardAwarePomdp(preprocessedPomdpPtr)) {
+        STORM_PRINT_AND_LOG("Detected that POMDP is reward-aware.\n");
+    } else {
+        STORM_PRINT_AND_LOG("Detected that POMDP is NOT reward-aware.\n");
+    }*/
 
     storm::pomdp::storage::BeliefExplorationBounds<ValueType> beliefExplorationBounds;
 

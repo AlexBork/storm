@@ -28,6 +28,16 @@ struct DeterministicActionUpdate final : FSCOutputUpdate {
 };
 // Extend here if more types of updates are needed (e.g. stochastic transitions for memory nodes)
 
+/**
+ * A finite-state controller (FSC) for POMDPs that bases its decisions on observations.
+ * Each node in the FSC corresponds to a memory state, and for each observation received in that node,
+ * the FSC specifies an action to take and the successor node to transition to.
+ * Observation and action IDs do not need to be continuously numbered, e.g. if the FSC stems from a belief MDP where some observations and actions are not used.
+ * Action IDs correspond to local action indices.
+ * To make the FSC generalise, we allow a mapping from IDs to names for observations and actions.
+ *
+ * @tparam ValueType The type used for probabilities in randomised action distributions.
+ */
 template<typename ValueType>
 class ObservationBasedFiniteStateController {
     using ActionOutputUpdate = std::unordered_map<uint64_t, std::shared_ptr<FSCOutputUpdate>>;
@@ -60,6 +70,12 @@ class ObservationBasedFiniteStateController {
     bool isDeterministic() const;
 
     bool outputIsRandomised(uint64_t originId, uint64_t observationId) const;
+
+    uint64_t getInitialNodeId() const;
+
+    bool hasIdToObservationNameMap() const;
+
+    bool hasIdToActionNameMap() const;
 
     std::string toString() const;
 

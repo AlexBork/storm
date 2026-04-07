@@ -191,7 +191,6 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::pomdpSched
     std::unordered_map<uint64_t, storm::storage::Distribution<typename PomdpModelType::ValueType, uint64_t>> result;
 
     // Iterate all POMDP states and group by observation id.
-    // Assumes the class has access to the POMDP model via `pomdp`.
     const uint64_t numStates = pomdp.getNumberOfStates();
     for (uint64_t state = 0; state < numStates; ++state) {
         // Get the observation id for this state.

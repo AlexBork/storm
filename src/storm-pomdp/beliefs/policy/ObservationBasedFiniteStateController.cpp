@@ -140,6 +140,21 @@ bool ObservationBasedFiniteStateController<ValueType>::outputIsRandomised(uint64
 }
 
 template<typename ValueType>
+uint64_t ObservationBasedFiniteStateController<ValueType>::getInitialNodeId() const {
+    return initialNodeId;
+}
+
+template<typename ValueType>
+bool ObservationBasedFiniteStateController<ValueType>::hasIdToObservationNameMap() const {
+    return static_cast<bool>(idToObservationName);
+}
+
+template<typename ValueType>
+bool ObservationBasedFiniteStateController<ValueType>::hasIdToActionNameMap() const {
+    return static_cast<bool>(idToActionName);
+}
+
+template<typename ValueType>
 std::string ObservationBasedFiniteStateController<ValueType>::toString() const {
     std::string result = "Observation-Based Finite State Controller:\n";
     result += "Initial Node ID: " + std::to_string(initialNodeId) + "\n";

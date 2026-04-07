@@ -5,6 +5,7 @@
 #include "storm-pomdp/beliefs/abstraction/RewardBoundedBeliefSplitter.h"
 #include "storm-pomdp/beliefs/exploration/BeliefExploration.h"
 #include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
+#include "storm-pomdp/beliefs/policy/ApplyObservationBasedFSCToPomdp.h"
 #include "storm-pomdp/beliefs/policy/PolicyExtractor.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelCheckerOptions.h"
@@ -307,6 +308,9 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
             pomdp, *beliefMdp, beliefStateObservationMap, res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>().getScheduler(),
             propertyInformation.dir == storm::OptimizationDirection::Minimize ? valueBounds.preprocessingBounds->upperSchedulers
                                                                               : valueBounds.preprocessingBounds->lowerSchedulers);
+        auto fsc = policyExtractor.exportPolicyAsFiniteStateController();
+        // STORM_PRINT(fsc.toString() << "\n");
+        storm::pomdp::policy::applyObservationBasedFSCToPomdp(pomdp, policyExtractor.exportPolicyAsFiniteStateController(), true);
     }
     return {res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>()[initState], !earlyExplorationStop};
 }
