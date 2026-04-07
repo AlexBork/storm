@@ -6,9 +6,9 @@
 #include "storm-pomdp/modelchecker/BeliefExplorationPomdpModelChecker.h"
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
 #include "storm-pomdp/transformer/KnownProbabilityTransformer.h"
-#include "storm-pomdp/transformer/MakePOMDPCanonic.h"
 #include "storm/api/storm.h"
 #include "storm/environment/solver/MinMaxSolverEnvironment.h"
+#include "storm/transformer/MakePOMDPCanonic.h"
 
 namespace {
 enum class PreprocessingType { None, SelfloopReduction, QualitativeReduction, All };
@@ -739,12 +739,7 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmin_SE) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-#if defined STORM_HAVE_Z3_OPTIMIZE
-
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmax_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
@@ -760,9 +755,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmax_Clip) {
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmin_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0");
@@ -778,9 +770,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmin_Clip) {
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0.4");
@@ -796,9 +785,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pma
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0.4");
@@ -822,9 +808,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmi
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmax_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0");
@@ -840,9 +823,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmax_Clip) {
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmin_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0");
@@ -858,9 +838,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmin_Clip) {
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0.4");
@@ -877,9 +854,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rma
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0.4");
@@ -895,9 +869,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmi
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmin_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0");
@@ -914,9 +885,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmin_Clip) {
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmax_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0");
@@ -928,9 +896,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmax_Clip) {
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0.075");
@@ -947,9 +912,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0.075");
@@ -961,9 +923,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmax_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmax=?[\"notbad\" U \"goal\"]", "N=4");
@@ -980,9 +939,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmax_Clip) {
 }
 
 TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmin_Clip) {
-    if (!storm::test::z3AtLeastVersion(4, 8, 5)) {
-        GTEST_SKIP() << "Test disabled since it triggers a bug in the installed version of z3.";
-    }
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmin=?[\"notbad\" U \"goal\"]", "N=4");
@@ -997,6 +953,5 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmin_Clip) {
         << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
-#endif  // defined STORM_HAVE_Z3_OPTIMIZE
 
 }  // namespace
