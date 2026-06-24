@@ -8,10 +8,10 @@
 #include "storm-pomdp/modelchecker/PreprocessingPomdpValueBoundsModelChecker.h"
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
 #include "storm-pomdp/transformer/KnownProbabilityTransformer.h"
-#include "storm-pomdp/transformer/MakePOMDPCanonic.h"
 #include "storm-pomdp/transformer/MakeStateSetObservationClosed.h"
 #include "storm/api/storm.h"
 #include "storm/environment/solver/MinMaxSolverEnvironment.h"
+#include "storm/transformer/MakePOMDPCanonic.h"
 #include "storm/utility/graph.h"
 
 namespace {
@@ -840,7 +840,7 @@ TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmin) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-#if defined STORM_HAVE_Z3_OPTIMIZE
+#if defined STORM_HAVE_LP_SOLVER
 TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmax) {
     typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
     typedef typename TestFixture::POMDPValueType POMDPValueType;
@@ -861,12 +861,22 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmax) {
     options.useClipping = true;
     options.clippingResolutions = std::vector<uint64_t>(data.model->getNrObservations(), 2);
 
+    BeliefMDPValueType overResultValue;
     BeliefMDPValueType underResultValue;
+    bool completedOverExploration;
     bool completedUnderExploration;
     auto expected = this->template parseNumber<BeliefMDPValueType>("7/10");
 
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
     std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
+    EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
+        << "Result [" << underResultValue << ", " << overResultValue
+        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmin) {
@@ -889,13 +899,23 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmin) {
     options.useClipping = true;
     options.clippingResolutions = std::vector<uint64_t>(data.model->getNrObservations(), 2);
 
+    BeliefMDPValueType overResultValue;
     BeliefMDPValueType underResultValue;
+    bool completedOverExploration;
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("3/10");
 
+    std::tie(overResultValue, completedOverExploration) =
+        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    EXPECT_GE(overResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
+
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
     std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
+    EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
+        << "Result [" << overResultValue << ", " << underResultValue
+        << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_slippery_Pmax) {
@@ -1277,6 +1297,6 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_refuel_Pmin) {
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
-#endif  // defined STORM_HAVE_Z3_OPTIMIZE
+#endif  // defined STORM_HAVE_LP_SOLVER
 
 }  // namespace

@@ -7,18 +7,22 @@
 #include "storm/storage/Scheduler.h"
 #include "storm/storage/sparse/ModelComponents.h"
 
+#include <unordered_set>
+
 namespace storm::pomdp::policy {
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
 PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::PolicyExtractor(
     PomdpModelType const& pomdp, BeliefMdpType const& beliefMdp, std::unordered_map<uint64_t, uint32_t> const& beliefStateToObservationMap,
     storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler,
-    std::optional<std::vector<storm::storage::Scheduler<typename PomdpModelType::ValueType>>> const& pomdpApproximationSchedulers)
+    std::optional<std::vector<storm::storage::Scheduler<typename PomdpModelType::ValueType>>> const& pomdpApproximationSchedulers,
+    PomdpModelType const* preprocessedPomdp)
     : pomdp(pomdp),
       beliefMdp(beliefMdp),
       beliefMdpScheduler(beliefMdpScheduler),
       beliefStateToObservationMap(beliefStateToObservationMap),
-      pomdpApproximationSchedulers(pomdpApproximationSchedulers) {
+      pomdpApproximationSchedulers(pomdpApproximationSchedulers),
+      preprocessedPomdp(preprocessedPomdp) {
     // Intentionally left empty
 }
 
@@ -28,31 +32,42 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPoli
     std::optional<std::unordered_map<uint64_t, std::string>> optionalIdToObservationName = std::nullopt;
     std::optional<std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::string>>> optionalIdToActionNameMap = std::nullopt;
     if (pomdp.hasObservationValuations()) {
-        auto obsValuations = pomdp.getObservationValuations();
+        auto const& obsValuations = pomdp.getObservationValuations();
         std::unordered_map<uint64_t, std::string> idToObservationNameMap;
+        std::unordered_set<std::string> usedObservationNames;
+        bool observationNamesAreUnique = true;
         for (uint64_t i = 0; i < pomdp.getNrObservations(); ++i) {
             std::string obsName = obsValuations.toString(i, true);
             std::ranges::replace(obsName, '\t', ' ');
+            if (obsName == "[]" || obsName.empty() || !usedObservationNames.insert(obsName).second) {
+                observationNamesAreUnique = false;
+                break;
+            }
             idToObservationNameMap[i] = obsName;
         }
-        optionalIdToObservationName = idToObservationNameMap;
+        if (observationNamesAreUnique) {
+            optionalIdToObservationName = idToObservationNameMap;
+        }
     }
     if (pomdp.hasChoiceLabeling()) {
-        auto choiceLabeling = pomdp.getChoiceLabeling();
+        auto const& choiceLabeling = pomdp.getChoiceLabeling();
         std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::string>> idToActionNameMap;
         for (uint64_t obs = 0; obs < pomdp.getNrObservations(); ++obs) {
+            if (pomdp.getStatesWithObservation(obs).empty()) {
+                continue;
+            }
             uint64_t representativeState = *pomdp.getStatesWithObservation(obs).begin();
-            for (uint64_t localChoice = 0; localChoice < pomdp.getNumberOfChoices(representativeState); ++localChoice) {
-                uint64_t globalChoiceIndex = pomdp.getTransitionMatrix().getRowGroupIndices()[representativeState] + localChoice;
-                // We assume that the choice has a unique label (or is unlabeled)
+            auto const rowGroupIndex = pomdp.getTransitionMatrix().getRowGroupIndices()[representativeState];
+            auto const rowGroupSize = pomdp.getTransitionMatrix().getRowGroupSize(representativeState);
+            for (uint64_t localChoice = 0; localChoice < rowGroupSize; ++localChoice) {
+                auto const globalChoiceIndex = rowGroupIndex + localChoice;
                 STORM_LOG_ASSERT(choiceLabeling.getLabelsOfChoice(globalChoiceIndex).size() <= 1,
                                  "Expected choice labeling to have at most one label per choice, but choice ID "
-                                     << obs << " has " << choiceLabeling.getLabelsOfChoice(obs).size() << " labels.");
+                                     << globalChoiceIndex << " has " << choiceLabeling.getLabelsOfChoice(globalChoiceIndex).size() << " labels.");
                 if (choiceLabeling.getLabelsOfChoice(globalChoiceIndex).empty()) {
                     idToActionNameMap[obs][localChoice] = "";
                 } else {
-                    std::string actionName = *choiceLabeling.getLabelsOfChoice(globalChoiceIndex).begin();
-                    idToActionNameMap[obs][localChoice] = actionName;
+                    idToActionNameMap[obs][localChoice] = *choiceLabeling.getLabelsOfChoice(globalChoiceIndex).begin();
                 }
             }
         }
@@ -64,16 +79,18 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPoli
     std::unordered_map<uint64_t, uint64_t> cutoffPolicyToFscNodeMap;
     std::queue<uint64_t> statesToProcess;
     // Add initial transition
-    fsc.addDeterministicActionTransition(0ul, beliefStateToObservationMap.at(beliefMdp.getInitialStates().getNextSetIndex(0)),
-                                         beliefMdpScheduler.getChoice(beliefMdp.getInitialStates().getNextSetIndex(0)).getDeterministicChoice(), 1ul);
-    beliefStateToFscNodeMap[beliefMdp.getInitialStates().getNextSetIndex(0)] = 1ul;
-    statesToProcess.push(beliefMdp.getInitialStates().getNextSetIndex(0));
+    auto const initialBeliefState = beliefMdp.getInitialStates().getNextSetIndex(0);
+    auto const initialChoice = beliefMdpScheduler.getChoice(initialBeliefState).getDeterministicChoice();
+    fsc.addDeterministicActionTransition(0ul, beliefStateToObservationMap.at(initialBeliefState), initialChoice, 1ul);
+    beliefStateToFscNodeMap[initialBeliefState] = 1ul;
+    statesToProcess.push(initialBeliefState);
     uint64_t nextId = 2ul;
 
     while (!statesToProcess.empty()) {
         uint64_t currentState = statesToProcess.front();
         statesToProcess.pop();
-        for (auto const& entry : beliefMdp.getTransitionMatrix().getRow(currentState, beliefMdpScheduler.getChoice(currentState).getDeterministicChoice())) {
+        auto const currentChoice = beliefMdpScheduler.getChoice(currentState).getDeterministicChoice();
+        for (auto const& entry : beliefMdp.getTransitionMatrix().getRow(currentState, currentChoice)) {
             auto successorBeliefStateId = entry.getColumn();
             if (beliefMdp.getStateLabeling().getStateHasLabel("truncated", successorBeliefStateId)) {
                 // State has been cut off. Add transition to self-looping cut-off policy node.
@@ -99,9 +116,9 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPoli
                     statesToProcess.push(successorBeliefStateId);
                 }
                 if (beliefStateToObservationMap.contains(successorBeliefStateId)) {
+                    auto const successorChoice = beliefMdpScheduler.getChoice(successorBeliefStateId).getDeterministicChoice();
                     fsc.addDeterministicActionTransition(beliefStateToFscNodeMap[currentState], beliefStateToObservationMap.at(successorBeliefStateId),
-                                                         beliefMdpScheduler.getChoice(successorBeliefStateId).getDeterministicChoice(),
-                                                         beliefStateToFscNodeMap[successorBeliefStateId]);
+                                                         successorChoice, beliefStateToFscNodeMap[successorBeliefStateId]);
                 }  // else, the state does not actually correspond to a belief, and we don't care what to do afterwards
             }
         }

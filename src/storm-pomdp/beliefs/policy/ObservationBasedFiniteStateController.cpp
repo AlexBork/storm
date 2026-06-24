@@ -96,7 +96,7 @@ void ObservationBasedFiniteStateController<ValueType>::setIdToActionNameMap(
 
 template<typename ValueType>
 std::string ObservationBasedFiniteStateController<ValueType>::getObservationName(uint64_t const observationId) const {
-    STORM_LOG_ASSERT(!idToObservationName, "idToObservationName is not set.");
+    STORM_LOG_ASSERT(idToObservationName, "idToObservationName is not set.");
     STORM_LOG_ASSERT(!idToObservationName->empty(), "idToObservationName is empty.");
     STORM_LOG_ASSERT(idToObservationName->contains(observationId), "Observation ID " << observationId << " not found.");
     return idToObservationName->at(observationId);
@@ -104,10 +104,36 @@ std::string ObservationBasedFiniteStateController<ValueType>::getObservationName
 
 template<typename ValueType>
 std::string ObservationBasedFiniteStateController<ValueType>::getActionName(uint64_t const observationId, uint64_t const actionId) const {
-    STORM_LOG_ASSERT(!idToActionName, "idToActionName is not set.");
+    STORM_LOG_ASSERT(idToActionName, "idToActionName is not set.");
     STORM_LOG_ASSERT(!idToActionName->empty(), "idToActionName is empty.");
-    STORM_LOG_ASSERT(idToActionName->contains(actionId), "Action ID " << actionId << " not found.");
+    STORM_LOG_ASSERT(idToActionName->contains(observationId), "Observation ID " << observationId << " not found.");
     return idToActionName->at(observationId).at(actionId);
+}
+
+template<typename ValueType>
+std::optional<uint64_t> ObservationBasedFiniteStateController<ValueType>::getObservationIdByName(std::string const& observationName) const {
+    if (!idToObservationName) {
+        return std::nullopt;
+    }
+    for (auto const& [observationId, name] : *idToObservationName) {
+        if (name == observationName) {
+            return observationId;
+        }
+    }
+    return std::nullopt;
+}
+
+template<typename ValueType>
+std::optional<uint64_t> ObservationBasedFiniteStateController<ValueType>::getActionIdByName(uint64_t const observationId, std::string const& actionName) const {
+    if (!idToActionName || !idToActionName->contains(observationId)) {
+        return std::nullopt;
+    }
+    for (auto const& [actionId, name] : idToActionName->at(observationId)) {
+        if (name == actionName) {
+            return actionId;
+        }
+    }
+    return std::nullopt;
 }
 
 template<typename ValueType>
@@ -192,6 +218,63 @@ std::string ObservationBasedFiniteStateController<ValueType>::toString() const {
         }
     }
     return result;
+}
+
+template<typename ValueType>
+void ObservationBasedFiniteStateController<ValueType>::writeDotToStream(std::ostream& outStream) const {
+    outStream << "digraph fsc {\n";
+    outStream << "\trankdir = LR;\n";
+    outStream << "\tnode [shape = circle];\n";
+    outStream << "\tinit [shape = point];\n";
+    outStream << "\tinit -> " << initialNodeId << ";\n";
+
+    std::unordered_set<uint64_t> nodes;
+    nodes.insert(initialNodeId);
+    for (auto const& [originId, actionOutputMap] : transitions) {
+        nodes.insert(originId);
+        for (auto const& [observationId, outputUpdatePtr] : actionOutputMap) {
+            nodes.insert(outputUpdatePtr->nextMemoryNode);
+            outStream << "\t" << originId << " -> " << outputUpdatePtr->nextMemoryNode << " [label=\"";
+            if (idToObservationName && idToObservationName->contains(observationId)) {
+                outStream << getObservationName(observationId);
+            } else {
+                outStream << observationId;
+            }
+            outStream << " / ";
+            if (outputUpdatePtr->randomisedActionOutput()) {
+                auto const& randActionUpdate = dynamic_cast<RandomisedActionUpdate<ValueType> const&>(*outputUpdatePtr);
+                outStream << "{";
+                bool first = true;
+                for (auto const& [actionId, prob] : randActionUpdate.actionDistribution) {
+                    if (!first) {
+                        outStream << ", ";
+                    }
+                    first = false;
+                    if (idToActionName && idToActionName->contains(observationId) && idToActionName->at(observationId).contains(actionId)) {
+                        outStream << idToActionName->at(observationId).at(actionId);
+                    } else {
+                        outStream << actionId;
+                    }
+                    outStream << ":" << storm::utility::to_string(prob);
+                }
+                outStream << "}";
+            } else {
+                auto const& detActionUpdate = dynamic_cast<DeterministicActionUpdate const&>(*outputUpdatePtr);
+                if (idToActionName && idToActionName->contains(observationId) && idToActionName->at(observationId).contains(detActionUpdate.action)) {
+                    outStream << idToActionName->at(observationId).at(detActionUpdate.action);
+                } else {
+                    outStream << detActionUpdate.action;
+                }
+            }
+            outStream << "\"];\n";
+        }
+    }
+    for (auto nodeId : nodes) {
+        if (nodeId == initialNodeId) {
+            outStream << "\t" << nodeId << " [shape = doublecircle];\n";
+        }
+    }
+    outStream << "}\n";
 }
 
 template class ObservationBasedFiniteStateController<double>;

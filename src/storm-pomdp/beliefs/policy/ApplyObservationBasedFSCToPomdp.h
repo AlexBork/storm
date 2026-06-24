@@ -4,6 +4,15 @@
 
 namespace storm {
 namespace pomdp::policy {
+namespace {
+template<typename PomdpValueType>
+std::string getObservationName(storm::models::sparse::Pomdp<PomdpValueType> const& pomdp, uint64_t const observationId) {
+    std::string observationName = pomdp.getObservationValuations().toString(observationId, true);
+    std::ranges::replace(observationName, '\t', ' ');
+    return observationName;
+}
+}  // namespace
+
 template<typename PomdpValueType, typename FscValueType>
 storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
     storm::models::sparse::Pomdp<PomdpValueType> const& pomdp, storm::pomdp::policy::ObservationBasedFiniteStateController<FscValueType> const& fsc,
@@ -23,14 +32,53 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
     STORM_LOG_DEBUG("Add initial state " << initialStateId << " (P: " << initialPomdpState << ", F: " << fsc.getInitialNodeId() << ")");
 
     std::optional<std::unordered_map<uint64_t, uint64_t>> pomdpObservationIdToFscObservationId = std::nullopt;
-    std::optional<std::unordered_map<uint64_t, std::unordered_map<uint64_t, uint64_t>>> pomdpActionIdToFscActionIdMap = std::nullopt;
-    // If the POMDP and FSC have naming information, use it to create mappings between actions and observations
-    // Otherwise, we assume that IDs correspond directly!
-    if (pomdp.hasChoiceLabeling() && pomdp.hasObservationValuations() && fsc.hasIdToActionNameMap() && fsc.hasIdToObservationNameMap()) {
-        // TODO
-        // Create mapping between POMDP observations and FSC observations
-        // Create mapping between POMDP actions and FSC actions
-    } else {
+    std::optional<std::unordered_map<uint64_t, std::unordered_map<uint64_t, uint64_t>>> fscActionIdToPomdpActionIdMap = std::nullopt;
+    // If the POMDP and FSC have naming information, use it to create mappings between actions and observations.
+    // Otherwise, we assume that IDs correspond directly.
+    if (fsc.hasIdToObservationNameMap()) {
+        STORM_LOG_THROW(pomdp.hasObservationValuations(), storm::exceptions::UnexpectedException,
+                        "The FSC uses observation names, but the POMDP has no observation valuations. Cannot apply the FSC robustly.");
+        std::unordered_map<uint64_t, uint64_t> observationMap;
+        for (uint64_t pomdpObservationId = 0; pomdpObservationId < pomdp.getNrObservations(); ++pomdpObservationId) {
+            auto const observationName = getObservationName(pomdp, pomdpObservationId);
+            auto fscObservationId = fsc.getObservationIdByName(observationName);
+            STORM_LOG_THROW(fscObservationId.has_value(), storm::exceptions::UnexpectedException,
+                            "Could not map POMDP observation " << pomdpObservationId << " (" << observationName << ") to an FSC observation.");
+            observationMap[pomdpObservationId] = *fscObservationId;
+        }
+        pomdpObservationIdToFscObservationId = std::move(observationMap);
+    }
+
+    if (fsc.hasIdToActionNameMap()) {
+        STORM_LOG_THROW(pomdp.hasChoiceLabeling(), storm::exceptions::UnexpectedException,
+                        "The FSC uses action names, but the POMDP has no choice labeling. Cannot apply the FSC robustly.");
+        std::unordered_map<uint64_t, std::unordered_map<uint64_t, uint64_t>> actionMap;
+        for (uint64_t pomdpObservationId = 0; pomdpObservationId < pomdp.getNrObservations(); ++pomdpObservationId) {
+            if (pomdp.getStatesWithObservation(pomdpObservationId).empty()) {
+                continue;
+            }
+            uint64_t representativeState = *pomdp.getStatesWithObservation(pomdpObservationId).begin();
+            uint64_t const pomdpRowGroupIndex = pomdp.getTransitionMatrix().getRowGroupIndices()[representativeState];
+            uint64_t const pomdpRowGroupSize = pomdp.getTransitionMatrix().getRowGroupSize(representativeState);
+            uint64_t const fscObservationId = pomdpObservationIdToFscObservationId && pomdpObservationIdToFscObservationId->contains(pomdpObservationId)
+                                                  ? pomdpObservationIdToFscObservationId->at(pomdpObservationId)
+                                                  : pomdpObservationId;
+            for (uint64_t localActionIndex = 0; localActionIndex < pomdpRowGroupSize; ++localActionIndex) {
+                auto const& labels = pomdp.getChoiceLabeling().getLabelsOfChoice(pomdpRowGroupIndex + localActionIndex);
+                if (labels.empty()) {
+                    actionMap[fscObservationId][localActionIndex] = localActionIndex;
+                    continue;
+                }
+                std::string const& actionName = *labels.begin();
+                if (auto fscActionId = fsc.getActionIdByName(fscObservationId, actionName)) {
+                    actionMap[fscObservationId][*fscActionId] = localActionIndex;
+                }
+            }
+        }
+        fscActionIdToPomdpActionIdMap = std::move(actionMap);
+    }
+
+    if (!pomdpObservationIdToFscObservationId && !fscActionIdToPomdpActionIdMap) {
         STORM_LOG_WARN(
             "The POMDP or the FSC is missing naming information for actions or observations. Assuming that IDs correspond directly (this might lead to "
             "unexpected results if they don't).");
@@ -45,19 +93,29 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
         STORM_LOG_DEBUG("Explore state " << currentStateId << " (P: " << currentPomdpState << ", F: " << currentFscNode << ")");
         storm::storage::Distribution<FscValueType, uint64_t> actionDistribution;
         uint64_t nextFSCNode;
-        if (fsc.hasOutputForObservationInNode(currentFscNode, pomdp.getObservation(currentPomdpState))) {
-            std::tie(actionDistribution, nextFSCNode) =
-                fsc.getActionDistributionAndSuccessorForObservationInNode(currentFscNode, pomdp.getObservation(currentPomdpState));
+        uint64_t const pomdpObservationId = pomdp.getObservation(currentPomdpState);
+        uint64_t const fscObservationId = pomdpObservationIdToFscObservationId && pomdpObservationIdToFscObservationId->contains(pomdpObservationId)
+                                              ? pomdpObservationIdToFscObservationId->at(pomdpObservationId)
+                                              : pomdpObservationId;
+        if (fsc.hasOutputForObservationInNode(currentFscNode, fscObservationId)) {
+            std::tie(actionDistribution, nextFSCNode) = fsc.getActionDistributionAndSuccessorForObservationInNode(currentFscNode, fscObservationId);
         } else {
             STORM_LOG_THROW(treatUnspecifiedChoiceAsDontCare, storm::exceptions::UnexpectedException,
-                            "Expected FSC to have an output for observation " << pomdp.getObservation(currentPomdpState) << " in FSC node " << currentFscNode
-                                                                              << ", but it does not.");
+                            "Expected FSC to have an output for observation " << fscObservationId << " in FSC node " << currentFscNode << ", but it does not.");
             // If requested, treat unspecified choice as don't care: pick the first enabled action deterministically and stay in the same FSC node
             nextFSCNode = currentFscNode;
             actionDistribution = storm::storage::Distribution<FscValueType, uint64_t>();
             actionDistribution.addProbability(0ul, storm::utility::one<FscValueType>());
         }
         for (auto const& actionEntry : actionDistribution) {
+            uint64_t pomdpActionId = actionEntry.first;
+            if (fscActionIdToPomdpActionIdMap) {
+                STORM_LOG_THROW(fscActionIdToPomdpActionIdMap->contains(fscObservationId) &&
+                                    fscActionIdToPomdpActionIdMap->at(fscObservationId).contains(actionEntry.first),
+                                storm::exceptions::UnexpectedException,
+                                "Could not map FSC action " << actionEntry.first << " for FSC observation " << fscObservationId << " to a POMDP action.");
+                pomdpActionId = fscActionIdToPomdpActionIdMap->at(fscObservationId).at(actionEntry.first);
+            }
             for (auto const& [rewardModelName, rewardModel] : pomdp.getRewardModels()) {
                 stateRewards[rewardModelName].push_back(storm::utility::zero<PomdpValueType>());
                 if (rewardModel.hasStateRewards()) {
@@ -65,14 +123,14 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
                 }
                 // We take the expected reward over the action distribution, so not all properties are preserved.
                 if (rewardModel.hasStateActionRewards()) {
-                    uint64_t globalActionIndex = pomdp.getTransitionMatrix().getRowGroupIndices()[currentPomdpState] + actionEntry.first;
+                    uint64_t globalActionIndex = pomdp.getTransitionMatrix().getRowGroupIndices()[currentPomdpState] + pomdpActionId;
                     stateRewards[rewardModelName][currentStateId] += rewardModel.getStateActionRewardVector()[globalActionIndex] * actionEntry.second;
                 }
                 if (rewardModel.hasTransitionRewards()) {
                     STORM_LOG_WARN("Transition rewards are not supported when applying an FSC to a POMDP. They will be ignored.");
                 }
             }
-            for (auto const& transitionEntry : pomdp.getTransitionMatrix().getRow(currentPomdpState, actionEntry.first)) {
+            for (auto const& transitionEntry : pomdp.getTransitionMatrix().getRow(currentPomdpState, pomdpActionId)) {
                 uint64_t successorPomdpState = transitionEntry.getColumn();
                 uint64_t successorNewStateId;
                 if (pomdpStateAndFscNodeToNewStateId.contains(successorPomdpState) &&
@@ -118,7 +176,7 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
     storm::models::sparse::StateLabeling stateLabeling(nextStateId);
     stateLabeling.addLabel("init");
     stateLabeling.addLabelToState("init", initialStateId);
-    for (uint64_t pomdpState = 0; pomdpState < nextStateId; ++pomdpState) {
+    for (uint64_t pomdpState = 0; pomdpState < pomdp.getNumberOfStates(); ++pomdpState) {
         if (pomdpStateAndFscNodeToNewStateId.contains(pomdpState)) {
             for (const auto& newStateId : pomdpStateAndFscNodeToNewStateId[pomdpState] | std::views::values) {
                 for (auto const& label : pomdp.getStateLabeling().getLabelsOfState(pomdpState)) {

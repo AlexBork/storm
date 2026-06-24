@@ -295,7 +295,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
                 components.rewardModels = preprocessedPomdpPtr->getRewardModels();
                 auto matrix = preprocessedPomdpPtr->getTransitionMatrix();
                 matrix.makeRowGroupsAbsorbing(formulaInfo.getSinkStates().states, true);
-                STORM_LOG_ASSERT(matrix.isProbabilistic(), "Resulting transition matrix is not a probability matrix.");
+                STORM_LOG_ASSERT(matrix.isProbabilistic(storm::utility::zero<ValueType>()), "Resulting transition matrix is not a probability matrix.");
                 STORM_LOG_ASSERT(matrix.hasOnlyPositiveEntries(), "Resulting transition matrix has non-positive entries.");
                 components.transitionMatrix = matrix;
                 components.observabilityClasses = preprocessedPomdpPtr->getObservations();

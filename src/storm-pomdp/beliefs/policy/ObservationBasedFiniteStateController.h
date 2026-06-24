@@ -66,6 +66,8 @@ class ObservationBasedFiniteStateController {
 
     std::string getObservationName(uint64_t observationId) const;
     std::string getActionName(uint64_t observationId, uint64_t actionId) const;
+    std::optional<uint64_t> getObservationIdByName(std::string const& observationName) const;
+    std::optional<uint64_t> getActionIdByName(uint64_t observationId, std::string const& actionName) const;
 
     bool isDeterministic() const;
 
@@ -78,6 +80,7 @@ class ObservationBasedFiniteStateController {
     bool hasIdToActionNameMap() const;
 
     std::string toString() const;
+    void writeDotToStream(std::ostream& outStream) const;
 
    private:
     void addActionOutputUpdate(uint64_t originId, uint64_t observationId, std::unique_ptr<FSCOutputUpdate> update);

@@ -286,7 +286,7 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     // Finally, perform model checking on the belief MDP.
     storm::utility::Stopwatch swCheck(true);
     auto formula = createFormulaForBeliefMdp(propertyInformation);
-    storm::modelchecker::CheckTask<storm::logic::Formula, BeliefMdpValueType> task(*formula, true);
+    storm::modelchecker::CheckTask<storm::logic::Formula, BeliefMdpValueType> task(*formula, !options.generatePolicy);
     task.setProduceSchedulers(options.generatePolicy);
     std::unique_ptr<storm::modelchecker::CheckResult> res(storm::api::verifyWithSparseEngine<BeliefMdpValueType>(env, beliefMdp, task));
     swCheck.stop();

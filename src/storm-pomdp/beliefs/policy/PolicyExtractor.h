@@ -26,7 +26,8 @@ class PolicyExtractor {
     PolicyExtractor(
         PomdpModelType const& pomdp, BeliefMdpType const& beliefMdp, std::unordered_map<uint64_t, uint32_t> const& beliefStateToObservationMap,
         storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler,
-        std::optional<std::vector<storm::storage::Scheduler<typename PomdpModelType::ValueType>>> const& pomdpApproximationSchedulers = std::nullopt);
+        std::optional<std::vector<storm::storage::Scheduler<typename PomdpModelType::ValueType>>> const& pomdpApproximationSchedulers = std::nullopt,
+        PomdpModelType const* preprocessedPomdp = nullptr);
 
     ObservationBasedFiniteStateController<typename PomdpModelType::ValueType> exportPolicyAsFiniteStateController() const;
 
@@ -41,6 +42,7 @@ class PolicyExtractor {
     storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler;
     std::unordered_map<uint64_t, uint32_t> const& beliefStateToObservationMap;
     std::optional<std::vector<storm::storage::Scheduler<typename PomdpModelType::ValueType>>> const pomdpApproximationSchedulers;
+    PomdpModelType const* preprocessedPomdp;
 };
 }  // namespace pomdp::policy
 }  // namespace storm

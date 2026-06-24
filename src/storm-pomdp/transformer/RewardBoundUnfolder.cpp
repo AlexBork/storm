@@ -281,7 +281,7 @@ ExplorationResult<ValueType> exploreUnfolding(storm::models::sparse::Model<Value
         }
     }
     auto matrix = matrixBuilder.build(numChoicesInUnfolding, stateEpochCollector.idToStateEpochPair.size(), stateEpochCollector.idToStateEpochPair.size());
-    STORM_LOG_ASSERT(matrix.isProbabilistic(), "Resulting transition matrix is not a probability matrix.");
+    STORM_LOG_ASSERT(matrix.isProbabilistic(storm::utility::zero<ValueType>()), "Resulting transition matrix is not a probability matrix.");
     STORM_LOG_ASSERT(matrix.hasOnlyPositiveEntries(), "Resulting transition matrix has non-positive entries.");
 
     return ExplorationResult<ValueType>{std::move(matrix), std::move(initialStateIds), std::move(levelRewardsForDimensions), std::move(activeDimensions),
