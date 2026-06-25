@@ -7,6 +7,7 @@
 #include "storm/storage/Scheduler.h"
 #include "storm/storage/sparse/ModelComponents.h"
 
+#include <queue>
 #include <unordered_set>
 
 namespace storm::pomdp::policy {
