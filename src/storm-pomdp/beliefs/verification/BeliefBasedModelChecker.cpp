@@ -20,6 +20,8 @@
 #include "storm/utility/graph.h"
 #include "storm/utility/macros.h"
 
+#include <sstream>
+
 namespace storm::pomdp::beliefs {
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
@@ -210,16 +212,16 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
 
 template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType, typename AbstractionType,
          typename InfoType = StandardExplorationInformation<BeliefMdpValueType, BeliefType>>
-std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment const& env, PomdpModelType const& pomdp,
-                                                            PropertyInformation const& propertyInformation,
-                                                            storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                            storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
-                                                            storm::OptionalRef<AbstractionType> abstraction = {}) {
+std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(
+    storm::Environment const& env, PomdpModelType const& pomdp, PropertyInformation const& propertyInformation,
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+    storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, storm::OptionalRef<AbstractionType> abstraction = {},
+    typename BeliefBasedModelChecker<PomdpModelType, typename BeliefType::ValueType, BeliefMdpValueType>::RunStatistics* statistics = nullptr) {
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::ReachabilityProbability ||
                          propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward,
                      "Unexpected kind of property.");
 
-    STORM_PRINT_AND_LOG("Exploring the belief space...\n");
+    STORM_LOG_INFO("Exploring the belief space.");
 
     // First, explore the beliefs and its successors
     using BeliefExplorationType = BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>;
@@ -270,18 +272,35 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     }
     swExplore.stop();
     bool earlyExplorationStop = info.queue.hasNext();
+    if (statistics) {
+        statistics->available = true;
+        statistics->completedExploration = !earlyExplorationStop;
+        statistics->discoveredBeliefs = info.discoveredBeliefs.getNumberOfBeliefIds();
+        statistics->exploredBeliefs = info.exploredBeliefs.size();
+        statistics->explorationTimeMilliseconds = swExplore.getTimeInMilliseconds();
+    }
     if (earlyExplorationStop) {
-        STORM_PRINT_AND_LOG("Exploration stopped before all beliefs were explored. " << info.discoveredBeliefs.getNumberOfBeliefIds() << " beliefs discovered. "
-                                                                                     << info.exploredBeliefs.size() << " beliefs explored.\n");
+        STORM_LOG_INFO("Exploration stopped before all beliefs were explored. " << info.discoveredBeliefs.getNumberOfBeliefIds() << " beliefs discovered. "
+                                                                                << info.exploredBeliefs.size() << " beliefs explored.");
     }
 
     // Second, build the Belief MDP from the exploration information
-    STORM_PRINT_AND_LOG("Constructing the belief MDP...\n");
+    STORM_LOG_INFO("Constructing the belief MDP.");
     storm::utility::Stopwatch swBuild(true);
     auto [beliefMdp, stateToBeliefMap] =
         buildBeliefMdpFromInfo<PomdpModelType, BeliefType, BeliefMdpValueType, InfoType>(propertyInformation, options, *valueBounds.preprocessingBounds, info);
     swBuild.stop();
-    beliefMdp->printModelInformationToStream(std::cout);
+    {
+        std::stringstream stream;
+        beliefMdp->printModelInformationToStream(stream);
+        STORM_LOG_INFO("Constructed belief MDP:\n" << stream.str());
+    }
+    if (statistics) {
+        statistics->beliefMdpStates = beliefMdp->getNumberOfStates();
+        statistics->beliefMdpChoices = beliefMdp->getNumberOfChoices();
+        statistics->beliefMdpTransitions = beliefMdp->getNumberOfTransitions();
+        statistics->beliefMdpBuildTimeMilliseconds = swBuild.getTimeInMilliseconds();
+    }
 
     // Finally, perform model checking on the belief MDP.
     storm::utility::Stopwatch swCheck(true);
@@ -290,14 +309,17 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
     task.setProduceSchedulers(options.generatePolicy);
     std::unique_ptr<storm::modelchecker::CheckResult> res(storm::api::verifyWithSparseEngine<BeliefMdpValueType>(env, beliefMdp, task));
     swCheck.stop();
-    STORM_PRINT_AND_LOG("Time for exploring beliefs: " << swExplore << ".\n");
-    STORM_PRINT_AND_LOG("Time for building the belief MDP: " << swBuild << ".\n");
-    STORM_PRINT_AND_LOG("Time for analyzing the belief MDP: " << swCheck << ".\n");
+    if (statistics) {
+        statistics->beliefMdpAnalysisTimeMilliseconds = swCheck.getTimeInMilliseconds();
+    }
+    STORM_LOG_INFO("Time for exploring beliefs: " << swExplore << ".");
+    STORM_LOG_INFO("Time for building the belief MDP: " << swBuild << ".");
+    STORM_LOG_INFO("Time for analyzing the belief MDP: " << swCheck << ".");
     STORM_LOG_ASSERT(res, "Model checking of belief MDP did not return any result.");
     STORM_LOG_ASSERT(res->isExplicitQuantitativeCheckResult(), "Model checking of belief MDP did not return result of expected type.");
     STORM_LOG_ASSERT(beliefMdp->getInitialStates().getNumberOfSetBits() == 1, "Unexpected number of initial states for belief Mdp.");
     auto const initState = beliefMdp->getInitialStates().getNextSetIndex(0);
-    if (options.generatePolicy) {
+    /*if (options.generatePolicy) {
         STORM_LOG_ASSERT(res->asQuantitativeCheckResult<BeliefMdpValueType>().hasScheduler() && options.buildChoiceLabeling,
                          "Model checking of belief MDP did not return a policy.");
         std::unordered_map<uint64_t, BeliefObservationType> beliefStateObservationMap;
@@ -311,7 +333,7 @@ std::pair<BeliefMdpValueType, bool> checkUnfoldOrDiscretize(storm::Environment c
         auto fsc = policyExtractor.exportPolicyAsFiniteStateController();
         // STORM_PRINT(fsc.toString() << "\n");
         storm::pomdp::policy::applyObservationBasedFSCToPomdp(pomdp, policyExtractor.exportPolicyAsFiniteStateController(), true);
-    }
+    }*/
     return {res->asExplicitQuantitativeCheckResult<BeliefMdpValueType>()[initState], !earlyExplorationStop};
 }
 
@@ -321,11 +343,12 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
     RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpModelType, BeliefType>& rewardSplitter,
-    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction = {}) {
+    storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction = {},
+    typename BeliefBasedModelChecker<PomdpModelType, typename BeliefType::ValueType, BeliefMdpValueType>::RunStatistics* statistics = nullptr) {
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::RewardBoundedReachabilityProbability, "Unexpected kind of property.");
     STORM_LOG_ASSERT(rewardSplitter.getNumberOfSetRewardModels() != 0, "rewardSplitter must have a reward model set for reward-aware belief MDP construction.");
 
-    STORM_PRINT_AND_LOG("Exploring the belief space...\n");
+    STORM_LOG_INFO("Exploring the belief space.");
 
     // First, explore the beliefs and its successors
     using BeliefExplorationType = BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>;
@@ -345,22 +368,39 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
     exploration.resumeRewardAwareExploration(info, terminalBeliefCallback, terminationCallback, rewardSplitter, abstraction);
     swExplore.stop();
     bool const earlyExplorationStop = info.queue.hasNext();
+    if (statistics) {
+        statistics->available = true;
+        statistics->completedExploration = !earlyExplorationStop;
+        statistics->discoveredBeliefs = info.discoveredBeliefs.getNumberOfBeliefIds();
+        statistics->exploredBeliefs = info.exploredBeliefs.size();
+        statistics->explorationTimeMilliseconds = swExplore.getTimeInMilliseconds();
+    }
     if (earlyExplorationStop) {
-        STORM_PRINT_AND_LOG("Exploration stopped before all beliefs were explored. " << info.discoveredBeliefs.getNumberOfBeliefIds() << " beliefs discovered. "
-                                                                                     << info.exploredBeliefs.size() << " beliefs explored.\n");
+        STORM_LOG_INFO("Exploration stopped before all beliefs were explored. " << info.discoveredBeliefs.getNumberOfBeliefIds() << " beliefs discovered. "
+                                                                                << info.exploredBeliefs.size() << " beliefs explored.");
     }
 
     // Second, build the Belief MDP from the exploration information
-    STORM_PRINT_AND_LOG("Constructing the belief MDP...\n");
+    STORM_LOG_INFO("Constructing the belief MDP.");
     storm::utility::Stopwatch swBuild(true);
     auto [beliefMdp, stateToBeliefMap] =
         buildBeliefMdpFromInfo<PomdpModelType, BeliefType, BeliefMdpValueType, InfoType>(propertyInformation, options, *valueBounds.preprocessingBounds, info);
     swBuild.stop();
-    beliefMdp->printModelInformationToStream(std::cout);
+    {
+        std::stringstream stream;
+        beliefMdp->printModelInformationToStream(stream);
+        STORM_LOG_INFO("Constructed belief MDP:\n" << stream.str());
+    }
+    if (statistics) {
+        statistics->beliefMdpStates = beliefMdp->getNumberOfStates();
+        statistics->beliefMdpChoices = beliefMdp->getNumberOfChoices();
+        statistics->beliefMdpTransitions = beliefMdp->getNumberOfTransitions();
+        statistics->beliefMdpBuildTimeMilliseconds = swBuild.getTimeInMilliseconds();
+    }
 
     // Finally, perform model checking on the belief MDP.
     auto formula = createFormulaForBeliefMdp(propertyInformation);
-    STORM_PRINT_AND_LOG("Analyzing property '" << *formula << "' on the belief MDP...\n");
+    STORM_LOG_INFO("Analyzing property '" << *formula << "' on the belief MDP.");
     storm::utility::Stopwatch swCheck(true);
     std::shared_ptr<storm::models::sparse::Mdp<BeliefMdpValueType>> processedMdp = beliefMdp;
     if (propertyInformation.kind == PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
@@ -371,8 +411,8 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
         processedMdp = storm::transformer::transformTransitionToActionRewards<BeliefMdpValueType>(processedMdp, rewardModelNames)
                            .model->template as<storm::models::sparse::Mdp<BeliefMdpValueType>>();
         double increase = static_cast<double>(processedMdp->getNumberOfStates()) / static_cast<double>(beliefMdp->getNumberOfStates());
-        STORM_PRINT_AND_LOG("Transformation of transition rewards resulted in a model with " << processedMdp->getNumberOfStates() << " states. " << increase
-                                                                                             << " times more states than the original belief MDP.\n");
+        STORM_LOG_INFO("Transformation of transition rewards resulted in a model with " << processedMdp->getNumberOfStates() << " states. " << increase
+                                                                                        << " times more states than the original belief MDP.");
 
         // Cut away states that can not reach the target
         auto targetStates = processedMdp->getStateLabeling().getStates("target");
@@ -388,14 +428,22 @@ std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfoldOrDiscretize(
         auto mergingResult = storm::transformer::GoalStateMerger(*processedMdp)
                                  .mergeTargetAndSinkStates(probGreaterZeroStates, ~probGreaterZeroStates, ~allStates, rewardModelNames);
         processedMdp = mergingResult.model;
-        STORM_PRINT_AND_LOG("Merging of sink states resulted in a model with " << processedMdp->getNumberOfStates() << " states.\n");
+        STORM_LOG_INFO("Merging of sink states resulted in a model with " << processedMdp->getNumberOfStates() << " states.");
+    }
+    if (statistics && processedMdp != beliefMdp) {
+        statistics->processedMdpStates = processedMdp->getNumberOfStates();
+        statistics->processedMdpChoices = processedMdp->getNumberOfChoices();
+        statistics->processedMdpTransitions = processedMdp->getNumberOfTransitions();
     }
     storm::modelchecker::CheckTask<storm::logic::Formula, BeliefMdpValueType> task(*formula, true);
     std::unique_ptr<storm::modelchecker::CheckResult> res(storm::api::verifyWithSparseEngine<BeliefMdpValueType>(env, processedMdp, task));
     swCheck.stop();
-    STORM_PRINT_AND_LOG("Time for exploring beliefs: " << swExplore << ".\n");
-    STORM_PRINT_AND_LOG("Time for building the belief MDP: " << swBuild << ".\n");
-    STORM_PRINT_AND_LOG("Time for analyzing the belief MDP: " << swCheck << ".\n");
+    if (statistics) {
+        statistics->beliefMdpAnalysisTimeMilliseconds = swCheck.getTimeInMilliseconds();
+    }
+    STORM_LOG_INFO("Time for exploring beliefs: " << swExplore << ".");
+    STORM_LOG_INFO("Time for building the belief MDP: " << swBuild << ".");
+    STORM_LOG_INFO("Time for analyzing the belief MDP: " << swCheck << ".");
     STORM_LOG_ASSERT(res, "Model checking of belief MDP did not return any result.");
     STORM_LOG_ASSERT(res->isExplicitQuantitativeCheckResult(), "Model checking of belief MDP did not return result of expected type.");
     STORM_LOG_ASSERT(processedMdp->getInitialStates().getNumberOfSetBits() == 1, "Unexpected number of initial states for (processed) belief Mdp.");
@@ -408,13 +456,14 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storm::pomdp::storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds) {
+    lastRunStatistics = RunStatistics();
     if (options.useClipping) {
         return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType, NoAbstractionType,
-                                       ClippingExplorationInformation<BeliefMdpValueType, Belief<BeliefValueType>>>(env, inputPomdp, propertyInformation,
-                                                                                                                    options, valueBounds);
+                                       ClippingExplorationInformation<BeliefMdpValueType, Belief<BeliefValueType>>>(
+            env, inputPomdp, propertyInformation, options, valueBounds, {}, &lastRunStatistics);
     } else {
-        return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType, NoAbstractionType>(env, inputPomdp, propertyInformation,
-                                                                                                                       options, valueBounds);
+        return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType, NoAbstractionType>(
+            env, inputPomdp, propertyInformation, options, valueBounds, {}, &lastRunStatistics);
     }
 }
 
@@ -423,10 +472,11 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds) {
+    lastRunStatistics = RunStatistics();
     auto mode = useDynamic ? FreudenthalTriangulationMode::Dynamic : FreudenthalTriangulationMode::Static;
     FreudenthalTriangulationBeliefAbstraction<Belief<BeliefValueType>> abstraction(storm::utility::convertNumber<BeliefValueType>(resolution), mode);
     return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(env, inputPomdp, propertyInformation, options, valueBounds,
-                                                                                                storm::OptionalRef(abstraction));
+                                                                                                storm::OptionalRef(abstraction), &lastRunStatistics);
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
@@ -434,14 +484,15 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames) {
+    lastRunStatistics = RunStatistics();
     RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpModelType, Belief<BeliefValueType>> rewardBoundedBeliefSplitter(inputPomdp);
     if (relevantRewardModelNames.empty()) {
         rewardBoundedBeliefSplitter.setRewardModel();
     } else {
         rewardBoundedBeliefSplitter.setRewardModels(relevantRewardModelNames);
     }
-    return checkRewardAwareUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(env, inputPomdp, propertyInformation, options,
-                                                                                                           valueBounds, rewardBoundedBeliefSplitter, {});
+    return checkRewardAwareUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(
+        env, inputPomdp, propertyInformation, options, valueBounds, rewardBoundedBeliefSplitter, {}, &lastRunStatistics);
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
@@ -449,6 +500,7 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames) {
+    lastRunStatistics = RunStatistics();
     auto mode = useDynamic ? FreudenthalTriangulationMode::Dynamic : FreudenthalTriangulationMode::Static;
     FreudenthalTriangulationBeliefAbstraction<Belief<BeliefValueType>> abstraction(storm::utility::convertNumber<BeliefValueType>(resolution), mode);
     RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpModelType, Belief<BeliefValueType>> rewardBoundedBeliefSplitter(inputPomdp);
@@ -458,7 +510,13 @@ std::pair<BeliefMdpValueType, bool> BeliefBasedModelChecker<PomdpModelType, Beli
         rewardBoundedBeliefSplitter.setRewardModels(relevantRewardModelNames);
     }
     return checkRewardAwareUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(
-        env, inputPomdp, propertyInformation, options, valueBounds, rewardBoundedBeliefSplitter, abstraction);
+        env, inputPomdp, propertyInformation, options, valueBounds, rewardBoundedBeliefSplitter, abstraction, &lastRunStatistics);
+}
+
+template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
+typename BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::RunStatistics const&
+BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::getLastRunStatistics() const {
+    return lastRunStatistics;
 }
 
 // TODO: Check which instantiations are actually necessary / reasonable.

@@ -7,6 +7,8 @@
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/models/sparse/Pomdp.h"
 
+#include <optional>
+
 namespace storm {
 class Environment;
 
@@ -17,6 +19,23 @@ template<typename PomdpModelType, typename BeliefValueType = typename PomdpModel
 class BeliefBasedModelChecker {
    public:
     using PomdpValueType = PomdpModelType::ValueType;
+
+    struct RunStatistics {
+        bool available = false;
+        bool completedExploration = false;
+        uint64_t discoveredBeliefs = 0;
+        uint64_t exploredBeliefs = 0;
+        uint64_t beliefMdpStates = 0;
+        uint64_t beliefMdpChoices = 0;
+        uint64_t beliefMdpTransitions = 0;
+        std::optional<uint64_t> processedMdpStates;
+        std::optional<uint64_t> processedMdpChoices;
+        std::optional<uint64_t> processedMdpTransitions;
+        uint64_t explorationTimeMilliseconds = 0;
+        uint64_t beliefMdpBuildTimeMilliseconds = 0;
+        uint64_t beliefMdpAnalysisTimeMilliseconds = 0;
+    };
+
     explicit BeliefBasedModelChecker(PomdpModelType const& pomdp);
 
     BeliefBasedModelChecker(PomdpModelType const& pomdp, storm::models::sparse::Pomdp<storm::RationalNumber> const& exactInputPomdp);
@@ -41,10 +60,13 @@ class BeliefBasedModelChecker {
                                                                    storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
                                                                    std::vector<std::string> const& relevantRewardModelNames = {});
 
+    RunStatistics const& getLastRunStatistics() const;
+
    private:
     PomdpModelType const& inputPomdp;
     // Optional version of the input POMDP used for computing exact beliefs if the input POMDP uses floating point numbers.
     std::optional<storm::models::sparse::Pomdp<storm::RationalNumber>> exactPomdp = std::nullopt;
+    RunStatistics lastRunStatistics;
 };
 }  // namespace pomdp::beliefs
 }  // namespace storm

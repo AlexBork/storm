@@ -124,6 +124,24 @@ void printResult(std::optional<ValueType> const& lowerBound, std::optional<Value
     }
 }
 
+template<typename Statistics>
+void printBeliefExplorationStatistics(Statistics const& statistics) {
+    if (!statistics.available) {
+        return;
+    }
+    STORM_PRINT_AND_LOG("Belief exploration " << (statistics.completedExploration ? "completed" : "stopped early") << ": " << statistics.discoveredBeliefs
+                                              << " beliefs discovered, " << statistics.exploredBeliefs << " beliefs explored.\n");
+    STORM_PRINT_AND_LOG("Constructed belief MDP: " << statistics.beliefMdpStates << " states, " << statistics.beliefMdpChoices << " choices, "
+                                                   << statistics.beliefMdpTransitions << " transitions.\n");
+    if (statistics.processedMdpStates && statistics.processedMdpChoices && statistics.processedMdpTransitions) {
+        STORM_PRINT_AND_LOG("Processed belief MDP: " << *statistics.processedMdpStates << " states, " << *statistics.processedMdpChoices << " choices, "
+                                                     << *statistics.processedMdpTransitions << " transitions.\n");
+    }
+    STORM_PRINT_AND_LOG("Time for exploring beliefs: " << statistics.explorationTimeMilliseconds << "ms.\n");
+    STORM_PRINT_AND_LOG("Time for building the belief MDP: " << statistics.beliefMdpBuildTimeMilliseconds << "ms.\n");
+    STORM_PRINT_AND_LOG("Time for analyzing the belief MDP: " << statistics.beliefMdpAnalysisTimeMilliseconds << "ms.\n");
+}
+
 MemlessSearchOptions fillMemlessSearchOptionsFromSettings() {
     storm::pomdp::MemlessSearchOptions options;
     auto const& qualSettings = storm::settings::getModule<storm::settings::modules::QualitativePOMDPAnalysisSettings>();
@@ -388,8 +406,6 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     }
     propertyInfo.dir = formulaInfo.getOptimizationDirection();
     propertyInfo.targetObservations = targetObservations;
-    propertyInfo.dir = formulaInfo.getOptimizationDirection();
-    propertyInfo.targetObservations = targetObservations;
     // TODO: add gap cut for other values; this is currently problematic as there is no way to not set a gap value
 
     storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>, BeliefType, BeliefMDPType> checker(*preprocessedPomdpPtr);
@@ -399,6 +415,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     bool isUnderApproximation{false};
     bool completedExploration{false};
     if (pomdpSettings.isBeliefExplorationDiscretizeSet()) {
+        STORM_PRINT_AND_LOG("Computing an over-approximation via belief MDP discretization...\n");
         isOverApproximation = true;
         if (belExplSettings.getSizeThresholdInit() == 0) {
             revisedOptions.maxExplorationSize.reset();
@@ -410,20 +427,21 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             for (auto const& rewardBound : propertyInfo.rewardBounds) {
                 relevantRewardModelNames.push_back(rewardBound.rewardModelName);
             }
-            overResultValue =
-                checker
-                    .checkRewardAwareDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
-                                                belExplSettings.isDynamicTriangulationModeSet(), beliefExplorationBounds, relevantRewardModelNames)
-                    .first;
+            auto checkResult =
+                checker.checkRewardAwareDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
+                                                   belExplSettings.isDynamicTriangulationModeSet(), beliefExplorationBounds, relevantRewardModelNames);
+            overResultValue = checkResult.first;
+            printBeliefExplorationStatistics(checker.getLastRunStatistics());
         } else {
-            overResultValue = checker
-                                  .checkDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
-                                                   belExplSettings.isDynamicTriangulationModeSet(), beliefExplorationBounds)
-                                  .first;
+            auto checkResult = checker.checkDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
+                                                       belExplSettings.isDynamicTriangulationModeSet(), beliefExplorationBounds);
+            overResultValue = checkResult.first;
+            printBeliefExplorationStatistics(checker.getLastRunStatistics());
         }
     }
 
     if (pomdpSettings.isBeliefExplorationUnfoldSet()) {
+        STORM_PRINT_AND_LOG("Computing an under-approximation via belief MDP unfolding...\n");
         if (belExplSettings.getSizeThresholdInit() == 0) {
             revisedOptions.maxExplorationSize = preprocessedPomdpPtr->getNumberOfStates() * preprocessedPomdpPtr->getMaxNrStatesWithSameObservation();
             STORM_PRINT_AND_LOG("Heuristically selected an under-approximation MDP size threshold of " << revisedOptions.maxExplorationSize.value() << ".\n");
@@ -442,8 +460,10 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             }
             std::tie(underResultValue, completedExploration) =
                 checker.checkRewardAwareUnfold(env, propertyInfo, revisedOptions, beliefExplorationBounds, relevantRewardModelNames);
+            printBeliefExplorationStatistics(checker.getLastRunStatistics());
         } else {
             std::tie(underResultValue, completedExploration) = checker.checkUnfold(env, propertyInfo, revisedOptions, beliefExplorationBounds);
+            printBeliefExplorationStatistics(checker.getLastRunStatistics());
         }
         isOverApproximation = (completedExploration && !belExplSettings.isUseClippingSet()) || isOverApproximation;
     }

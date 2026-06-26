@@ -846,7 +846,6 @@ TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rma
 
     ValueType expected = this->parseNumber("29/30");
     EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
-    STORM_PRINT("res: " << result.lowerBound.value() << "\n");
     EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
         << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
