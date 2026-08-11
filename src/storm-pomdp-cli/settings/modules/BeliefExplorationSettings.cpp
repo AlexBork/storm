@@ -25,6 +25,9 @@ const std::string triangulationModeOption = "triangulationmode";
 const std::string clippingOption = "use-clipping";
 const std::string cutZeroGapOption = "cut-zero-gap";
 const std::string stateEliminationCutoffOption = "state-elimination-cutoff";
+const std::string inexactPreprocessingOption = "inexact-preprocessing";
+const std::string beliefMdpNumberTypeOption = "belief-mdp-number-type";
+std::vector<std::string> const beliefMdpNumberTypes = {"double", "rational", "match"};
 
 BeliefExplorationSettings::BeliefExplorationSettings() : ModuleSettings(moduleName) {
     this->addOption(
@@ -157,6 +160,16 @@ BeliefExplorationSettings::BeliefExplorationSettings() : ModuleSettings(moduleNa
     this->addOption(storm::settings::OptionBuilder(moduleName, stateEliminationCutoffOption, false,
                                                    "If this is set, an additional unfolding step for cut-off beliefs is performed.")
                         .build());
+    this->addOption(storm::settings::OptionBuilder(moduleName, inexactPreprocessingOption, false,
+                                                   "If this is set, the POMDP will be analysed using floating point arithmetic for preprocessing. This speeds "
+                                                   "up computations, but can lead to inaccurate results.")
+                        .build());
+    this->addOption(storm::settings::OptionBuilder(moduleName, beliefMdpNumberTypeOption, false, "Sets the number type to use for generated belief MDPs")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument("type", "Type to use.")
+                                         .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(beliefMdpNumberTypes))
+                                         .setDefaultValueString("match")
+                                         .build())
+                        .build());
 }
 
 bool BeliefExplorationSettings::isRefineSet() const {
@@ -239,12 +252,28 @@ bool BeliefExplorationSettings::isStaticTriangulationModeSet() const {
     return this->getOption(triangulationModeOption).getArgumentByName("value").getValueAsString() == "static";
 }
 
+bool BeliefExplorationSettings::isBeliefMDPNumberTypeDouble() const {
+    return this->getOption(beliefMdpNumberTypeOption).getArgumentByName("type").getValueAsString() == "double";
+}
+
+bool BeliefExplorationSettings::isBeliefMDPNumberTypeRational() const {
+    return this->getOption(beliefMdpNumberTypeOption).getArgumentByName("type").getValueAsString() == "rational";
+}
+
+bool BeliefExplorationSettings::isBeliefMDPNumberTypeMatch() const {
+    return this->getOption(beliefMdpNumberTypeOption).getArgumentByName("type").getValueAsString() == "match";
+}
+
 bool BeliefExplorationSettings::isUseClippingSet() const {
     return this->getOption(clippingOption).getHasOptionBeenSet();
 }
 
 bool BeliefExplorationSettings::isCutZeroGapSet() const {
     return this->getOption(cutZeroGapOption).getHasOptionBeenSet();
+}
+
+bool BeliefExplorationSettings::isInexactPreprocessingSet() const {
+    return this->getOption(inexactPreprocessingOption).getHasOptionBeenSet();
 }
 
 template<typename ValueType>

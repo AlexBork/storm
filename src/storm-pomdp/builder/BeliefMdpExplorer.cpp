@@ -1276,13 +1276,13 @@ std::vector<typename BeliefMdpExplorer<PomdpType, BeliefValueType>::BeliefId> Be
 template<typename PomdpType, typename BeliefValueType>
 typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType BeliefMdpExplorer<PomdpType, BeliefValueType>::getTrivialUpperBoundAtPOMDPState(
     uint64_t const &pomdpState) {
-    return pomdpValueBounds.getSmallestUpperBound(pomdpState);
+    return pomdpValueBounds.template getSmallestUpperBound<ValueType>(pomdpState);
 }
 
 template<typename PomdpType, typename BeliefValueType>
 typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType BeliefMdpExplorer<PomdpType, BeliefValueType>::getTrivialLowerBoundAtPOMDPState(
     uint64_t const &pomdpState) {
-    return pomdpValueBounds.getHighestLowerBound(pomdpState);
+    return pomdpValueBounds.template getHighestLowerBound<ValueType>(pomdpState);
 }
 
 template<typename PomdpType, typename BeliefValueType>
@@ -1303,7 +1303,7 @@ uint64_t BeliefMdpExplorer<PomdpType, BeliefValueType>::getNrOfMemoryNodesForObs
 template<typename PomdpType, typename BeliefValueType>
 typename BeliefMdpExplorer<PomdpType, BeliefValueType>::ValueType BeliefMdpExplorer<PomdpType, BeliefValueType>::getExtremeValueBoundAtPOMDPState(
     const uint64_t &pomdpState) {
-    return extremeValueBound.getValueForState(pomdpState);
+    return extremeValueBound.template getValueForState<ValueType>(pomdpState);
 }
 
 template<typename PomdpType, typename BeliefValueType>

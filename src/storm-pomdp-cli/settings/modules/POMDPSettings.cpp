@@ -17,6 +17,8 @@ const std::string noCanonicOption = "nocanonic";
 const std::string exportAsParametricModelOption = "parametric-drn";
 const std::string beliefExplorationOption = "belief-exploration";
 const std::vector<std::string> beliefExplorationModes = {"both", "discretize", "unfold"};
+const std::string beliefExplorationLegacyOption = "legacy-belief-exploration";
+std::vector<std::string> const legacyBeliefExplorationModes = {"both", "discretize", "unfold"};
 const std::string qualitativeReductionOption = "qualitativereduction";
 const std::string analyzeUniqueObservationsOption = "uniqueobservations";
 const std::string selfloopReductionOption = "selfloopreduction";
@@ -25,6 +27,8 @@ const std::string memoryPatternOption = "memorypattern";
 const std::vector<std::string> memoryPatterns = {"trivial", "fixedcounter", "selectivecounter", "ring", "fixedring", "settablebits", "full"};
 const std::string checkFullyObservableOption = "check-fully-observable";
 const std::string isQualitativeOption = "qualitative-analysis";
+const std::string isBoundedToUnboundedReachabilityTransformationOption = "unfold-reward-bound";
+const std::string isRewardObservableOption = "reward-aware";
 
 POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
     this->addOption(storm::settings::OptionBuilder(moduleName, noCanonicOption, false,
@@ -54,16 +58,36 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
                                          .build())
                         .build());
     this->addOption(
-        storm::settings::OptionBuilder(moduleName, beliefExplorationOption, false, "Analyze the POMDP by exploring the belief state-space.")
+        storm::settings::OptionBuilder(moduleName, beliefExplorationLegacyOption, false,
+                                       "Analyze the POMDP by exploring the belief space using the legacy implementation.")
             .addArgument(storm::settings::ArgumentBuilder::createStringArgument("mode", "Sets whether lower, upper, or interval result bounds are computed.")
-                             .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(beliefExplorationModes))
+                             .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(legacyBeliefExplorationModes))
                              .setDefaultValueString("both")
                              .makeOptional()
                              .build())
             .build());
+    this->addOption(storm::settings::OptionBuilder(moduleName, beliefExplorationOption, false, "Analyze the POMDP by exploring the belief space.")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument(
+                                         "mode", "Sets whether lower bounds, upper bounds, or interval bounds are computed.")
+                                         .addValidatorString(ArgumentValidatorFactory::createMultipleChoiceValidator(beliefExplorationModes))
+                                         .setDefaultValueString("both")
+                                         .makeOptional()
+                                         .build())
+                        .build());
     this->addOption(
         storm::settings::OptionBuilder(moduleName, checkFullyObservableOption, false, "Performs standard model checking on the underlying MDP").build());
     this->addOption(storm::settings::OptionBuilder(moduleName, isQualitativeOption, false, "Sets the option qualitative analysis").build());
+    this->addOption(storm::settings::OptionBuilder(
+                        moduleName, isBoundedToUnboundedReachabilityTransformationOption, false,
+                        "Sets the option that reward bounded reachability properties are transformed to an unbounded problem on an unfolded POMDP.")
+                        .build());
+    this->addOption(storm::settings::OptionBuilder(moduleName, isRewardObservableOption, false,
+                                                   "Sets the option that rewards are observable for bounded reachability properties.")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument("levelwidths", "comma separated list of width of reward levels.")
+                                         .setDefaultValueString("")
+                                         .makeOptional()
+                                         .build())
+                        .build());
 }
 
 bool POMDPSettings::isNoCanonicSet() const {
@@ -104,12 +128,45 @@ bool POMDPSettings::isBeliefExplorationUnfoldSet() const {
     return isBeliefExplorationSet() && (arg == "unfold" || arg == "both");
 }
 
+bool POMDPSettings::isLegacyBeliefExplorationSet() const {
+    return this->getOption(beliefExplorationLegacyOption).getHasOptionBeenSet();
+}
+
+bool POMDPSettings::isLegacyBeliefExplorationDiscretizeSet() const {
+    std::string arg = this->getOption(beliefExplorationLegacyOption).getArgumentByName("mode").getValueAsString();
+    return isLegacyBeliefExplorationSet() && (arg == "discretize" || arg == "both");
+}
+
+bool POMDPSettings::isLegacyBeliefExplorationUnfoldSet() const {
+    std::string arg = this->getOption(beliefExplorationLegacyOption).getArgumentByName("mode").getValueAsString();
+    return isLegacyBeliefExplorationSet() && (arg == "unfold" || arg == "both");
+}
+
 bool POMDPSettings::isCheckFullyObservableSet() const {
     return this->getOption(checkFullyObservableOption).getHasOptionBeenSet();
 }
 
 bool POMDPSettings::isQualitativeAnalysisSet() const {
     return this->getOption(isQualitativeOption).getHasOptionBeenSet();
+}
+
+bool POMDPSettings::isBoundedToUnboundedReachabilityTransformationSet() const {
+    return this->getOption(isBoundedToUnboundedReachabilityTransformationOption).getHasOptionBeenSet();
+}
+
+bool POMDPSettings::isRewardObservableSet() const {
+    return this->getOption(isRewardObservableOption).getHasOptionBeenSet();
+}
+
+std::vector<uint64_t> POMDPSettings::getLevelWidthForBoundedReachability() const {
+    auto const input = this->getOption(isRewardObservableOption).getArgumentByName("levelwidths").getValueAsString();
+    if (input.empty()) {
+        return {};
+    }
+    // split the string by comma
+    auto result = input | std::ranges::views::split(',') |
+                  std::ranges::views::transform([](auto&& r) -> uint64_t { return std::stoull(std::string(r.begin(), r.end())); });
+    return {result.begin(), result.end()};
 }
 
 uint64_t POMDPSettings::getMemoryBound() const {

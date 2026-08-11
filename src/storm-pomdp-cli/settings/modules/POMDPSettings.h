@@ -29,10 +29,16 @@ class POMDPSettings : public ModuleSettings {
     bool isBeliefExplorationSet() const;
     bool isBeliefExplorationDiscretizeSet() const;
     bool isBeliefExplorationUnfoldSet() const;
+    bool isLegacyBeliefExplorationSet() const;
+    bool isLegacyBeliefExplorationDiscretizeSet() const;
+    bool isLegacyBeliefExplorationUnfoldSet() const;
     bool isAnalyzeUniqueObservationsSet() const;
     bool isSelfloopReductionSet() const;
     bool isCheckFullyObservableSet() const;
     bool isQualitativeAnalysisSet() const;
+    bool isBoundedToUnboundedReachabilityTransformationSet() const;
+    std::vector<uint64_t> getLevelWidthForBoundedReachability() const;
+    bool isRewardObservableSet() const;
     uint64_t getMemoryBound() const;
 
     storm::storage::PomdpMemoryPattern getMemoryPattern() const;

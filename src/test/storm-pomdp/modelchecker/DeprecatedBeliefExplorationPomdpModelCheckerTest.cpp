@@ -193,10 +193,10 @@ class PreprocessedDefaultRationalPIEnvironment {
 };
 
 template<typename TestType>
-class BeliefExplorationPomdpModelCheckerTest : public ::testing::Test {
+class DeprecatedBeliefExplorationPomdpModelCheckerTest : public ::testing::Test {
    public:
     typedef typename TestType::ValueType ValueType;
-    BeliefExplorationPomdpModelCheckerTest() : _environment(TestType::createEnvironment()) {}
+    DeprecatedBeliefExplorationPomdpModelCheckerTest() : _environment(TestType::createEnvironment()) {}
 
     void SetUp() override {
 #ifndef STORM_HAVE_Z3
@@ -295,9 +295,9 @@ typedef ::testing::Types<DefaultDoubleVIEnvironment, SelfloopReductionDefaultDou
                          DefaultDoubleOVIEnvironment, DefaultRationalPIEnvironment, PreprocessedDefaultRationalPIEnvironment>
     TestingTypes;
 
-TYPED_TEST_SUITE(BeliefExplorationPomdpModelCheckerTest, TestingTypes, );
+TYPED_TEST_SUITE(DeprecatedBeliefExplorationPomdpModelCheckerTest, TestingTypes, );
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
@@ -305,14 +305,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmax_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
@@ -321,14 +321,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0");
@@ -336,14 +336,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("3/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmin_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0");
@@ -352,14 +352,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("3/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0.4");
@@ -367,14 +367,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0.4");
@@ -383,14 +383,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0.4");
@@ -402,18 +402,18 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin) {
         // This model's value can only be approximated arbitrarily close but never reached
         // Exact arithmetics will thus not reach the value with absoulute precision either.
         ValueType approxPrecision = storm::utility::convertNumber<ValueType>(1e-5);
-        EXPECT_LE(result.lowerBound, expected + approxPrecision);
-        EXPECT_GE(result.upperBound, expected - approxPrecision);
+        EXPECT_LE(result.lowerBound.value(), expected + approxPrecision);
+        EXPECT_GE(result.upperBound.value(), expected - approxPrecision);
     } else {
-        EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-        EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+        EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+        EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     }
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0.4");
@@ -426,18 +426,18 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_SE) {
         // This model's value can only be approximated arbitrarily close but never reached
         // Exact arithmetics will thus not reach the value with absoulute precision either.
         ValueType approxPrecision = storm::utility::convertNumber<ValueType>(1e-5);
-        EXPECT_LE(result.lowerBound, expected + approxPrecision);
-        EXPECT_GE(result.upperBound, expected - approxPrecision);
+        EXPECT_LE(result.lowerBound.value(), expected + approxPrecision);
+        EXPECT_GE(result.upperBound.value(), expected - approxPrecision);
     } else {
-        EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-        EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+        EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+        EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     }
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0");
@@ -445,14 +445,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("29/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmax_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0");
@@ -461,14 +461,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("29/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0");
@@ -476,14 +476,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("19/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmin_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0");
@@ -492,14 +492,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("19/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0.4");
@@ -507,14 +507,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("29/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0.4");
@@ -523,14 +523,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("29/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0.4");
@@ -538,14 +538,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("19/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0.4");
@@ -554,14 +554,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("19/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0");
@@ -569,15 +569,15 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("74/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmin_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0");
@@ -586,26 +586,26 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("74/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0");
     storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
     auto result = checker.check(this->env(), *data.formula);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound.value()));
+    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound.value()));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmax_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0");
@@ -613,11 +613,11 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax_SE) {
                                                                                                                     this->optionsWithStateElimination());
     auto result = checker.check(this->env(), *data.formula);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound.value()));
+    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound.value()));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0.075");
@@ -625,15 +625,15 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("80/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0.075");
@@ -642,26 +642,26 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("80/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0.075");
     storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->options());
     auto result = checker.check(this->env(), *data.formula);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound.value()));
+    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound.value()));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0.075");
@@ -669,11 +669,11 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_SE) {
                                                                                                                     this->optionsWithStateElimination());
     auto result = checker.check(this->env(), *data.formula);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound.value()));
+    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound.value()));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmax) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmax=?[\"notbad\" U \"goal\"]", "N=4");
@@ -681,15 +681,15 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("38/155");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmax_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmax=?[\"notbad\" U \"goal\"]", "N=4");
@@ -698,15 +698,15 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("38/155");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmin) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmin=?[\"notbad\" U \"goal\"]", "N=4");
@@ -714,15 +714,15 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("0");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin_SE) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmin_SE) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmin=?[\"notbad\" U \"goal\"]", "N=4");
@@ -731,15 +731,15 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin_SE) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("0");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmax_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
@@ -747,14 +747,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmax_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Pmin_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0");
@@ -762,14 +762,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Pmin_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("3/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0.4");
@@ -777,14 +777,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmax_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("7/10");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0.4");
@@ -796,18 +796,18 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Pmin_Clip) {
         // This model's value can only be approximated arbitrarily close but never reached
         // Exact arithmetics will thus not reach the value with absoulute precision either.
         ValueType approxPrecision = storm::utility::convertNumber<ValueType>(1e-4);
-        EXPECT_LE(result.lowerBound, expected + approxPrecision);
-        EXPECT_GE(result.upperBound, expected - approxPrecision);
+        EXPECT_LE(result.lowerBound.value(), expected + approxPrecision);
+        EXPECT_GE(result.upperBound.value(), expected - approxPrecision);
     } else {
-        EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision() * 10);
-        EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision() * 10);
+        EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision() * 10);
+        EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision() * 10);
     }
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmax_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0");
@@ -815,14 +815,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmax_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("29/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_Rmin_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0");
@@ -830,14 +830,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_Rmin_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("19/50");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmax=? [F s>4 ]", "slippery=0.4");
@@ -845,14 +845,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmax_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("29/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Rmin=? [F s>4 ]", "slippery=0.4");
@@ -860,14 +860,14 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, simple_slippery_Rmin_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("19/30");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmin_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0");
@@ -875,26 +875,26 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmin_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("74/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_Rmax_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_Rmax_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0");
     storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->optionsWithClipping());
     auto result = checker.check(this->env(), *data.formula);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound.value()));
+    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound.value()));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmin=? [F \"goal\"]", "sl=0.075");
@@ -902,26 +902,26 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmin_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("80/91");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, maze2_slippery_Rmax_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/maze2.prism", "Rmax=? [F \"goal\"]", "sl=0.075");
     storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>> checker(data.model, this->optionsWithClipping());
     auto result = checker.check(this->env(), *data.formula);
 
-    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound));
-    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound));
+    EXPECT_TRUE(storm::utility::isInfinity(result.lowerBound.value()));
+    EXPECT_TRUE(storm::utility::isInfinity(result.upperBound.value()));
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmax_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmax=?[\"notbad\" U \"goal\"]", "N=4");
@@ -929,15 +929,15 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmax_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("38/155");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
-TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin_Clip) {
+TYPED_TEST(DeprecatedBeliefExplorationPomdpModelCheckerTest, refuel_Pmin_Clip) {
     typedef typename TestFixture::ValueType ValueType;
 
     auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/refuel.prism", "Pmin=?[\"notbad\" U \"goal\"]", "N=4");
@@ -945,11 +945,11 @@ TYPED_TEST(BeliefExplorationPomdpModelCheckerTest, refuel_Pmin_Clip) {
     auto result = checker.check(this->env(), *data.formula);
 
     ValueType expected = this->parseNumber("0");
-    EXPECT_LE(result.lowerBound, expected + this->modelcheckingPrecision());
-    EXPECT_GE(result.upperBound, expected - this->modelcheckingPrecision());
+    EXPECT_LE(result.lowerBound.value(), expected + this->modelcheckingPrecision());
+    EXPECT_GE(result.upperBound.value(), expected - this->modelcheckingPrecision());
     // Use relative difference of bounds for this one
     EXPECT_LE(result.diff(), this->precision())
-        << "Result [" << result.lowerBound << ", " << result.upperBound
+        << "Result [" << result.lowerBound.value() << ", " << result.upperBound.value()
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
