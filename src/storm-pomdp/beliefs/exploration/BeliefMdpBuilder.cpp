@@ -343,13 +343,13 @@ template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_
     ExplorationInformation<double, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
     std::function<std::unordered_map<std::string, double>(Belief<double> const&)> const& computeCutOffValueMap);
 
-template std::pair<std::shared_ptr<models::sparse::Mdp<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdp(
+template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdp(
     ExplorationInformation<storm::RationalNumber, Belief<double>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, __gmp_expr<__mpq_struct[1], __mpq_struct[1]>>(Belief<double> const&)> const& computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, storm::RationalNumber>(Belief<double> const&)> const& computeCutOffValueMap);
 
 template std::pair<std::shared_ptr<models::sparse::Mdp<double>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdp(
     ExplorationInformation<double, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,
-    std::function<std::unordered_map<std::string, double>(Belief<__gmp_expr<__mpq_struct[1], __mpq_struct[1]>> const&)> const& computeCutOffValueMap);
+    std::function<std::unordered_map<std::string, double>(Belief<storm::RationalNumber> const&)> const& computeCutOffValueMap);
 
 template std::pair<std::shared_ptr<models::sparse::Mdp<storm::RationalNumber>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdp(
     ExplorationInformation<storm::RationalNumber, Belief<storm::RationalNumber>> const& explorationInformation, PropertyInformation const& propertyInformation,

@@ -1,5 +1,6 @@
 #include "storm-pomdp/beliefs/exploration/BeliefExplorationMatrix.h"
 
+#include <optional>
 #include "storm/adapters/RationalNumberAdapter.h"
 
 namespace storm::pomdp::beliefs {
