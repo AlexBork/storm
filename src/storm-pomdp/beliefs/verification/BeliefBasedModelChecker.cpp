@@ -63,30 +63,29 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
         if (options.maxGapToCut.has_value()) {
             // Terminate if the gap is small enough
             auto const maxGapToCut = storm::utility::convertNumber<PomdpValueType>(options.maxGapToCut.value());
-            return
-                [&propertyInformation, &valueBounds, maxGapToCut](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
-                    if (propertyInformation.targetObservations.contains(belief.observation())) {
-                        return storm::utility::zero<BeliefMdpValueType>();
-                    } else {
-                        auto smallestUpper = storm::utility::infinity<PomdpValueType>();
-                        for (auto const& valueList : valueBounds.upper) {
-                            smallestUpper = std::min(smallestUpper, belief.template getWeightedSum<PomdpValueType>(valueList));
-                        }
-                        PomdpValueType largestLower = -storm::utility::infinity<PomdpValueType>();
-                        for (auto const& valueList : valueBounds.lower) {
-                            largestLower = storm::utility::max(largestLower, belief.template getWeightedSum<PomdpValueType>(valueList));
-                        }
-                        if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
-                            if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
-                                return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
-                            } else {
-                                return storm::utility::convertNumber<BeliefMdpValueType>(
-                                    propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper);
-                            }
-                        }
-                        return std::nullopt;
+            return [&propertyInformation, &valueBounds, maxGapToCut](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
+                if (propertyInformation.targetObservations.contains(belief.observation())) {
+                    return storm::utility::zero<BeliefMdpValueType>();
+                } else {
+                    auto smallestUpper = storm::utility::infinity<PomdpValueType>();
+                    for (auto const& valueList : valueBounds.upper) {
+                        smallestUpper = std::min(smallestUpper, belief.template getWeightedSum<PomdpValueType>(valueList));
                     }
-                };
+                    PomdpValueType largestLower = -storm::utility::infinity<PomdpValueType>();
+                    for (auto const& valueList : valueBounds.lower) {
+                        largestLower = storm::utility::max(largestLower, belief.template getWeightedSum<PomdpValueType>(valueList));
+                    }
+                    if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
+                        if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
+                            return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
+                        } else {
+                            return storm::utility::convertNumber<BeliefMdpValueType>(
+                                propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper);
+                        }
+                    }
+                    return std::nullopt;
+                }
+            };
         } else {
             return [&propertyInformation](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
                 if (propertyInformation.targetObservations.contains(belief.observation())) {
