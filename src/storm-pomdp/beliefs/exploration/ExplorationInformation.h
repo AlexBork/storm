@@ -1,4 +1,10 @@
 #pragma once
+
+#include <optional>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 #include "storm-pomdp/beliefs/exploration/BeliefExplorationMatrix.h"
 #include "storm-pomdp/beliefs/exploration/ExplorationQueue.h"
 #include "storm-pomdp/beliefs/storage/BeliefCollector.h"

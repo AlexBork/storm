@@ -1,4 +1,9 @@
 #pragma once
+
+#include <cstdint>
+#include <optional>
+#include <vector>
+
 #include <storm-pomdp/beliefs/exploration/ExplorationQueueOrder.h>
 
 namespace storm::pomdp::beliefs {

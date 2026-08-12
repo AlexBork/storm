@@ -1,6 +1,7 @@
 #pragma once
 
 #include <deque>
+#include <unordered_set>
 
 #include "storm-pomdp/beliefs/exploration/ExplorationQueueOrder.h"
 #include "storm-pomdp/beliefs/utility/types.h"

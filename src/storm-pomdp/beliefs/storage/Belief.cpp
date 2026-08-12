@@ -6,6 +6,8 @@
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/utility/NumberTraits.h"
 
+#include <boost/functional/hash.hpp>
+
 namespace storm::pomdp::beliefs {
 
 template<typename ValueType>

@@ -62,8 +62,9 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
     if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
         if (options.maxGapToCut.has_value()) {
             // Terminate if the gap is small enough
+            auto const maxGapToCut = storm::utility::convertNumber<PomdpValueType>(options.maxGapToCut.value());
             return
-                [&propertyInformation, &valueBounds, maxGapToCut = options.maxGapToCut.value()](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
+                [&propertyInformation, &valueBounds, maxGapToCut](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
                     if (propertyInformation.targetObservations.contains(belief.observation())) {
                         return storm::utility::zero<BeliefMdpValueType>();
                     } else {
@@ -102,7 +103,8 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
         };
     } else if (options.maxGapToCut.has_value()) {
         // Terminate if the gap is small enough
-        return [&propertyInformation, &valueBounds, maxGapToCut = options.maxGapToCut.value()](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
+        auto const maxGapToCut = storm::utility::convertNumber<PomdpValueType>(options.maxGapToCut.value());
+        return [&propertyInformation, &valueBounds, maxGapToCut](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
             if (propertyInformation.targetObservations.contains(belief.observation())) {
                 return storm::utility::one<BeliefMdpValueType>();
             } else {
