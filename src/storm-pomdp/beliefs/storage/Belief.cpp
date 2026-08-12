@@ -69,15 +69,11 @@ std::string Belief<ValueType>::toString(bool convertToDouble) const {
 template<typename ValueType>
 std::size_t Belief<ValueType>::BeliefHash::operator()(Belief const& belief) const {
     auto seed = static_cast<std::size_t>(belief.obs);
-    if constexpr (storm::NumberTraits<ValueType>::IsExact) {
-        boost::hash_combine(seed, belief.data);
-    } else {
-        static_assert(BeliefFlatMapIsOrdered);
-        belief.forEach([&seed](auto const& state, auto const& val) {
-            boost::hash_combine(seed, state);
-            boost::hash_combine(seed, BeliefNumerics<ValueType>::valueForHash(val));
-        });
-    }
+    static_assert(BeliefFlatMapIsOrdered);
+    belief.forEach([&seed](auto const& state, auto const& val) {
+        boost::hash_combine(seed, state);
+        boost::hash_combine(seed, BeliefNumerics<ValueType>::valueForHash(val));
+    });
     return seed;
 }
 

@@ -2,6 +2,7 @@
 #include <boost/container/flat_map.hpp>
 
 #include <cstdint>
+#include <limits>
 
 namespace storm::pomdp::beliefs {
 

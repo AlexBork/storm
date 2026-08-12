@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unordered_map>
+#include <vector>
+
 #include "storm-pomdp/beliefs/utility/types.h"
 
 namespace storm::pomdp::beliefs {

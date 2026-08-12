@@ -1,5 +1,14 @@
 #pragma once
 
+#include <memory>
+#include <optional>
+#include <vector>
+
+#include "storm/models/sparse/ModelForward.h"
+#include "storm/storage/Scheduler.h"
+#include "storm/utility/constants.h"
+#include "storm/utility/macros.h"
+
 namespace storm::storage {
 template<typename ValueType>
 class Scheduler;
