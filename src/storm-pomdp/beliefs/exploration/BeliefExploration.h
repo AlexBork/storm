@@ -2,14 +2,11 @@
 
 #include <functional>
 #include <optional>
+#include <vector>
 
 #include "storm-pomdp/beliefs/exploration/ExplorationInformation.h"
-
 #include "storm-pomdp/beliefs/exploration/FirstStateNextStateGenerator.h"
-
 #include "storm/utility/OptionalRef.h"
-#include "storm/utility/vector.h"
-
 #include "storm/utility/SignalHandler.h"
 
 namespace storm::pomdp::beliefs {

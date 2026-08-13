@@ -1,18 +1,10 @@
 #pragma once
 
-#include <memory>
 #include <optional>
-#include <vector>
 
-#include "storm/models/sparse/ModelForward.h"
-#include "storm/storage/Scheduler.h"
 #include "storm/utility/constants.h"
 #include "storm/utility/macros.h"
 
-namespace storm::storage {
-template<typename ValueType>
-class Scheduler;
-}
 namespace storm::pomdp::storage {
 /**
  * Struct used to store the results of the model checker
@@ -62,7 +54,5 @@ struct BeliefExplorationResult {
 
     std::optional<ValueType> lowerBound = std::nullopt;
     std::optional<ValueType> upperBound = std::nullopt;
-    std::shared_ptr<storm::models::sparse::Model<ValueType>> schedulerAsMarkovChain;
-    std::vector<storm::storage::Scheduler<ValueType>> cutoffSchedulers;
 };
 }  // namespace storm::pomdp::storage

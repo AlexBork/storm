@@ -29,9 +29,6 @@ class POMDPSettings : public ModuleSettings {
     bool isBeliefExplorationSet() const;
     bool isBeliefExplorationDiscretizeSet() const;
     bool isBeliefExplorationUnfoldSet() const;
-    bool isLegacyBeliefExplorationSet() const;
-    bool isLegacyBeliefExplorationDiscretizeSet() const;
-    bool isLegacyBeliefExplorationUnfoldSet() const;
     bool isAnalyzeUniqueObservationsSet() const;
     bool isSelfloopReductionSet() const;
     bool isCheckFullyObservableSet() const;

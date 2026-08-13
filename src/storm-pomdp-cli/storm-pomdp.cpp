@@ -17,8 +17,8 @@
 #include "storm-pomdp/analysis/UniqueObservationStates.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
-#include "storm-pomdp/modelchecker/BeliefExplorationPomdpModelChecker.h"
 #include "storm-pomdp/modelchecker/PreprocessingPomdpValueBoundsModelChecker.h"
+#include "storm-pomdp/storage/BeliefExplorationResult.h"
 #include "storm-pomdp/transformer/ApplyFiniteSchedulerToPomdp.h"
 #include "storm-pomdp/transformer/BinaryPomdpTransformer.h"
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
@@ -361,7 +361,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             }
         }
     } else {
-        // We only bounded probability formulae, so we can use 0-1 bounds
+        // We only consider bounded probability formulae, so we can use 0-1 bounds
         // TODO make smarter pre-computed value bounds
         storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> zeroOneValueBound;
         zeroOneValueBound.lower.push_back(std::vector<ValueType>(preprocessedPomdpPtr->getNumberOfStates(), storm::utility::zero<ValueType>()));
@@ -371,7 +371,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     }
 
     uint64_t initialPomdpState = preprocessedPomdpPtr->getInitialStates().getNextSetIndex(0);
-    storm::pomdp::storage::BeliefExplorationResult<BeliefMDPType> result(
+    storage::BeliefExplorationResult<BeliefMDPType> result(
         beliefExplorationBounds.preprocessingBounds->template getHighestLowerBound<BeliefMDPType>(initialPomdpState),
         beliefExplorationBounds.preprocessingBounds->template getSmallestUpperBound<BeliefMDPType>(initialPomdpState));
     STORM_LOG_INFO("Initial value bounds are [" << *result.lowerBound << ", " << *result.upperBound << "]");
@@ -515,23 +515,6 @@ bool performAnalysis(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> co
                              "Expected belief MDP number type to be set to match the POMDP, but it is not.");
             performBeliefExploration<ValueType, BeliefType, ValueType>(pomdp, formulaInfo, formula);
         }
-    } else if (pomdpSettings.isLegacyBeliefExplorationSet()) {
-        STORM_LOG_WARN("Legacy belief exploration is deprecated and will be phased out in a future release.");
-        STORM_PRINT_AND_LOG("Exploring the belief MDP... \n");
-        auto options = storm::pomdp::modelchecker::BeliefExplorationPomdpModelCheckerOptions<ValueType>(pomdpSettings.isLegacyBeliefExplorationDiscretizeSet(),
-                                                                                                        pomdpSettings.isLegacyBeliefExplorationUnfoldSet());
-        auto const& beliefExplorationSettings = storm::settings::getModule<storm::settings::modules::BeliefExplorationSettings>();
-        beliefExplorationSettings.setValuesInOptionsStruct(options);
-        storm::pomdp::modelchecker::BeliefExplorationPomdpModelChecker<storm::models::sparse::Pomdp<ValueType>, BeliefType> checker(pomdp, options);
-        auto result = checker.check(formula);
-        checker.printStatisticsToStream(std::cout);
-        if (storm::utility::resources::isTerminate()) {
-            STORM_PRINT_AND_LOG("\nResult till abort: ");
-        } else {
-            STORM_PRINT_AND_LOG("\nResult: ");
-        }
-        printResult(result.lowerBound, result.upperBound);
-        STORM_PRINT_AND_LOG('\n');
         analysisPerformed = true;
     }
     if (pomdpSettings.isQualitativeAnalysisSet()) {

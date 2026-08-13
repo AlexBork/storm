@@ -7,7 +7,6 @@
 #include "storm/modelchecker/propositional/SparsePropositionalModelChecker.h"
 #include "storm/modelchecker/results/ExplicitQualitativeCheckResult.h"
 #include "storm/models/sparse/Pomdp.h"
-#include "storm/models/sparse/StandardRewardModel.h"
 #include "storm/utility/macros.h"
 
 namespace storm {
