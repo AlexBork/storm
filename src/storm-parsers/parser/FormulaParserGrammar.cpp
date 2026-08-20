@@ -474,6 +474,8 @@ std::shared_ptr<storm::logic::Formula const> FormulaParserGrammar::createEventua
                                            std::shared_ptr<storm::logic::TimeBoundReference>>>> const& timeBounds,
     storm::logic::FormulaContext context, std::shared_ptr<storm::logic::Formula const> const& subformula) const {
     if (timeBounds && !timeBounds.get().empty()) {
+        // Conversion of boost::optional to std::optional
+        // This can be simplified if the input is changed to already use std::optional
         std::vector<std::optional<storm::logic::TimeBound>> lowerBounds, upperBounds;
         std::vector<storm::logic::TimeBoundReference> timeBoundReferences;
         for (auto const& timeBound : timeBounds.get()) {
@@ -512,6 +514,8 @@ std::shared_ptr<storm::logic::Formula const> FormulaParserGrammar::createUntilFo
                                            std::shared_ptr<storm::logic::TimeBoundReference>>>> const& timeBounds,
     std::shared_ptr<storm::logic::Formula const> const& rightSubformula) {
     if (timeBounds && !timeBounds.get().empty()) {
+        // Conversion of boost::optional to std::optional
+        // This can be simplified if the input is changed to already use std::optional
         std::vector<std::optional<storm::logic::TimeBound>> lowerBounds, upperBounds;
         std::vector<storm::logic::TimeBoundReference> timeBoundReferences;
         for (auto const& timeBound : timeBounds.get()) {
