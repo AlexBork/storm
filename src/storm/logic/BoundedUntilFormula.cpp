@@ -259,22 +259,6 @@ std::optional<TimeBound> BoundedUntilFormula::getUpperBoundAsOptionalTimeBound(u
     return upperBound.at(i);
 }
 
-std::optional<TimeBound> BoundedUntilFormula::getLowerBoundAsOptionalTimeBound(unsigned i) const {
-    if (hasLowerBound(i)) {
-        return lowerBound.at(i).get();
-    } else {
-        return std::nullopt;
-    }
-}
-
-std::optional<TimeBound> BoundedUntilFormula::getUpperBoundAsOptionalTimeBound(unsigned i) const {
-    if (hasUpperBound(i)) {
-        return upperBound.at(i).get();
-    } else {
-        return std::nullopt;
-    }
-}
-
 template<>
 double BoundedUntilFormula::getLowerBound(unsigned i) const {
     if (!hasLowerBound(i)) {

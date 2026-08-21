@@ -415,7 +415,7 @@ std::shared_ptr<storm::logic::Formula> constructFormula(storm::logic::BoundedUnt
     // Construct a new (bounded or unbounded) until formula
     auto lhs = boundedUntilFormula.getLeftSubformula().clone();
     auto rhs = boundedUntilFormula.getRightSubformula().clone();
-    std::vector<boost::optional<storm::logic::TimeBound>> lowerBounds, upperBounds;
+    std::vector<std::optional<storm::logic::TimeBound>> lowerBounds, upperBounds;
     std::vector<storm::logic::TimeBoundReference> timeBoundReferences;
     STORM_LOG_ASSERT(boundedUntilFormula.getDimension() > 0, "did not expect a 0-dimensional formula.");
     auto const& exprManager =

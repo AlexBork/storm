@@ -35,8 +35,8 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
             auto target = std::make_shared<storm::logic::AtomicLabelFormula const>("target");
             auto trueFormula = std::make_shared<storm::logic::BooleanLiteralFormula const>(true);
 
-            std::vector<boost::optional<logic::TimeBound>> lowerBounds;
-            std::vector<boost::optional<logic::TimeBound>> upperBounds;
+            std::vector<std::optional<logic::TimeBound>> lowerBounds;
+            std::vector<std::optional<logic::TimeBound>> upperBounds;
             std::vector<logic::TimeBoundReference> timeBoundReferences;
 
             for (auto const& rewardBound : propertyInformation.rewardBounds) {
@@ -48,12 +48,12 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
                 if (rewardBound.lowerBound.has_value()) {
                     lowerBounds.emplace_back(rewardBound.lowerBound.value());
                 } else {
-                    lowerBounds.emplace_back(boost::none);
+                    lowerBounds.emplace_back(std::nullopt);
                 }
                 if (rewardBound.upperBound.has_value()) {
                     upperBounds.emplace_back(rewardBound.upperBound.value());
                 } else {
-                    upperBounds.emplace_back(boost::none);
+                    upperBounds.emplace_back(std::nullopt);
                 }
             }
             auto eventuallyTarget =
