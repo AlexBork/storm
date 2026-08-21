@@ -228,8 +228,9 @@ BitVector& BitVector::operator=(BitVector&& other) {
 
 bool BitVector::operator==(BitVector const& other) const {
     // If the lengths of the vectors do not match, they are considered unequal.
-    if (this->bitCount != other.bitCount)
+    if (this->bitCount != other.bitCount) {
         return false;
+    }
 
     // If the lengths match, we compare the buckets one by one.
     return std::equal(this->buckets, this->buckets + this->bucketCount(), other.buckets);
@@ -395,7 +396,7 @@ BitVector BitVector::operator%(BitVector const& filter) const {
     // over its elements.
     if (filter.getNumberOfSetBits() / 10 < this->getNumberOfSetBits()) {
         uint64_t position = 0;
-        for (auto bit : filter) {
+        for (uint64_t bit : filter) {
             if ((*this)[bit]) {
                 result.set(position);
             }
@@ -404,7 +405,7 @@ BitVector BitVector::operator%(BitVector const& filter) const {
     } else {
         // If the given bit vector had much fewer elements, we iterate over its elements and accept calling the
         // more costly operation getNumberOfSetBitsBeforeIndex on the current bit vector.
-        for (auto bit : (*this)) {
+        for (uint64_t bit : (*this)) {
             if (filter[bit]) {
                 result.set(filter.getNumberOfSetBitsBeforeIndex(bit));
             }
@@ -714,7 +715,7 @@ std::vector<uint64_t> BitVector::getNumberOfSetBitsBeforeIndices() const {
     bitsSetBeforeIndices.reserve(this->size());
     uint64_t lastIndex = 0;
     uint64_t currentNumberOfSetBits = 0;
-    for (auto index : *this) {
+    for (uint64_t index : *this) {
         while (lastIndex <= index) {
             bitsSetBeforeIndices.push_back(currentNumberOfSetBits);
             ++lastIndex;
@@ -1128,7 +1129,7 @@ void BitVector::truncateLastBucket() {
 
 std::ostream& operator<<(std::ostream& out, BitVector const& bitvector) {
     out << "bit vector(" << bitvector.getNumberOfSetBits() << "/" << bitvector.bitCount << ") [";
-    for (auto index : bitvector) {
+    for (uint64_t index : bitvector) {
         out << index << " ";
     }
     out << "]";
@@ -1385,12 +1386,13 @@ BitVector BitVector::load(std::string const& description) {
     std::string field;
     char ws_delim;
     while (true) {
-        if (ss >> field)
+        if (ss >> field) {
             splitted.push_back(field);
-        else if (ss.eof())
+        } else if (ss.eof()) {
             break;
-        else
+        } else {
             splitted.push_back(std::string());
+        }
         ss.clear();
         ss >> ws_delim;
     }

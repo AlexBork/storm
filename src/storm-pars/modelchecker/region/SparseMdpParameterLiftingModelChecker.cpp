@@ -324,17 +324,21 @@ std::vector<ConstantType> SparseMdpParameterLiftingModelChecker<SparseModelType,
 
     // Set up the solver
     auto solver = solverFactory->create(env, player1Matrix, parameterLifter->getMatrix());
-    if (lowerResultBound)
+    if (lowerResultBound) {
         solver->setLowerBound(lowerResultBound.value());
-    if (upperResultBound)
+    }
+    if (upperResultBound) {
         solver->setUpperBound(upperResultBound.value());
+    }
     if (applyPreviousResultAsHint) {
         solver->setTrackSchedulers(true);
         x.resize(maybeStates.getNumberOfSetBits(), storm::utility::zero<ConstantType>());
-        if (storm::solver::minimize(dirForParameters) && minSchedChoices && player1SchedChoices)
+        if (storm::solver::minimize(dirForParameters) && minSchedChoices && player1SchedChoices) {
             solver->setSchedulerHints(std::move(player1SchedChoices.value()), std::move(minSchedChoices.value()));
-        if (storm::solver::maximize(dirForParameters) && maxSchedChoices && player1SchedChoices)
+        }
+        if (storm::solver::maximize(dirForParameters) && maxSchedChoices && player1SchedChoices) {
             solver->setSchedulerHints(std::move(player1SchedChoices.value()), std::move(maxSchedChoices.value()));
+        }
     } else {
         x.assign(maybeStates.getNumberOfSetBits(), storm::utility::zero<ConstantType>());
     }
@@ -375,7 +379,7 @@ std::vector<ConstantType> SparseMdpParameterLiftingModelChecker<SparseModelType,
     // Get the result for the complete model (including maybestates)
     std::vector<ConstantType> result = resultsForNonMaybeStates;
     auto maybeStateResIt = x.begin();
-    for (auto maybeState : maybeStates) {
+    for (uint64_t maybeState : maybeStates) {
         result[maybeState] = *maybeStateResIt;
         ++maybeStateResIt;
     }
@@ -390,7 +394,7 @@ void SparseMdpParameterLiftingModelChecker<SparseModelType, ConstantType>::compu
         // only count selected rows
         n = selectedRows->getNumberOfSetBits();
     } else {
-        for (auto maybeState : maybeStates) {
+        for (uint64_t maybeState : maybeStates) {
             n += this->parametricModel->getTransitionMatrix().getRowGroupSize(maybeState);
         }
     }
@@ -398,7 +402,7 @@ void SparseMdpParameterLiftingModelChecker<SparseModelType, ConstantType>::compu
     // The player 1 matrix is the identity matrix of size n with the row groups as given by the original matrix (potentially without unselected rows)
     storm::storage::SparseMatrixBuilder<storm::storage::sparse::state_type> matrixBuilder(n, n, n, true, true, maybeStates.getNumberOfSetBits());
     uint64_t p1MatrixRow = 0;
-    for (auto maybeState : maybeStates) {
+    for (uint64_t maybeState : maybeStates) {
         matrixBuilder.newRowGroup(p1MatrixRow);
         if (selectedRows) {
             for (uint64_t row = selectedRows->getNextSetIndex(this->parametricModel->getTransitionMatrix().getRowGroupIndices()[maybeState]);

@@ -141,10 +141,12 @@ std::vector<SolutionType> computeRobustValuesForMaybeStates(Environment const& e
 
     // Set up the solver.
     storm::solver::GeneralMinMaxLinearEquationSolverFactory<ValueType, SolutionType> minMaxLinearEquationSolverFactory;
+    // The goal is consumed by the solver configuration, so capture what is needed first.
+    auto const uncertaintyResolutionMode = goal.getUncertaintyResolutionMode();
     std::unique_ptr<storm::solver::MinMaxLinearEquationSolver<ValueType, SolutionType>> solver = storm::solver::configureMinMaxLinearEquationSolver(
         env, std::move(goal), minMaxLinearEquationSolverFactory, std::move(submatrix),
         convert(OptimizationDirection::Maximize));  // default to maximize for IDTMCs; does not affect the result
-    solver->setUncertaintyResolutionMode(goal.getUncertaintyResolutionMode());
+    solver->setUncertaintyResolutionMode(uncertaintyResolutionMode);
     solver->setHasUniqueSolution(computeReward);  // As we check for graph-preservation, in case of rewards on IDTMCs, we have a unique solution
     solver->setHasNoEndComponents(false);
 
@@ -184,7 +186,7 @@ std::vector<SolutionType> SparseDtmcPrctlHelper<ValueType, RewardModelType, Solu
         std::vector<SolutionType> const& resultsForNonMaybeStates = hint.template asExplicitModelCheckerHint<SolutionType>().getResultHint();
         statesWithProbability1 = storm::storage::BitVector(maybeStates.size(), false);
         storm::storage::BitVector nonMaybeStates = ~maybeStates;
-        for (auto state : nonMaybeStates) {
+        for (uint64_t state : nonMaybeStates) {
             if (storm::utility::isOne(resultsForNonMaybeStates[state])) {
                 statesWithProbability1.set(state, true);
                 result[state] = storm::utility::one<SolutionType>();
@@ -328,7 +330,7 @@ std::vector<SolutionType> SparseDtmcPrctlHelper<ValueType, RewardModelType, Solu
             // Set initial states
             size_t i = 0;
             ValueType initDist = storm::utility::one<ValueType>() / storm::utility::convertNumber<ValueType>(initialStates.getNumberOfSetBits());
-            for (auto state : relevantStates) {
+            for (uint64_t state : relevantStates) {
                 if (initialStates.get(state)) {
                     b[i] = initDist;
                 }
@@ -779,7 +781,7 @@ SparseDtmcPrctlHelper<ValueType, RewardModelType, SolutionType>::computeBaierTra
             }
 
             // Then, create the transitions of the 'normal' states.
-            for (auto state : statesWithProbabilityGreater0) {
+            for (uint64_t state : statesWithProbabilityGreater0) {
                 ValueType zeroProbability = storm::utility::zero<ValueType>();
                 for (auto const& successorEntry : transitionMatrix.getRow(state)) {
                     if (statesWithProbabilityGreater0.get(successorEntry.getColumn())) {
@@ -803,7 +805,7 @@ SparseDtmcPrctlHelper<ValueType, RewardModelType, SolutionType>::computeBaierTra
             result.transitionMatrix = builder.build(addDeadlockState ? (deadlockState + 1) : deadlockState);
             storm::storage::BitVector newTargetStates = targetStates % result.beforeStates;
             newTargetStates.resize(result.transitionMatrix.get().getRowCount());
-            for (auto state : targetStates % statesWithProbabilityGreater0) {
+            for (uint64_t state : targetStates % statesWithProbabilityGreater0) {
                 newTargetStates.set(normalStatesOffset + state, true);
             }
             result.targetStates = std::move(newTargetStates);
@@ -814,7 +816,7 @@ SparseDtmcPrctlHelper<ValueType, RewardModelType, SolutionType>::computeBaierTra
                 storm::utility::vector::selectVectorValues(newStateRewards, result.beforeStates, stateRewards.get());
 
                 newStateRewards.reserve(result.transitionMatrix.get().getRowCount());
-                for (auto state : statesWithProbabilityGreater0) {
+                for (uint64_t state : statesWithProbabilityGreater0) {
                     newStateRewards.push_back(stateRewards.get()[state]);
                 }
                 // Add a zero reward to the deadlock state.
