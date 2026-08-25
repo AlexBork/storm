@@ -1,4 +1,4 @@
-#include <typeinfo>
+#include <type_traits>
 
 #include "storm-cli-utilities/cli.h"
 #include "storm-cli-utilities/model-handling.h"
@@ -36,7 +36,7 @@
 #include "storm/exceptions/WrongFormatException.h"
 #include "storm/modelchecker/results/ExplicitQualitativeCheckResult.h"
 #include "storm/transformer/MakePOMDPCanonic.h"
-#include "storm/transformer/SparseModelValueTypeTransformer.h"
+#include "storm/transformer/SparseRationalModelToDoubleTransformer.h"
 #include "storm/utility/NumberTraits.h"
 #include "storm/utility/SignalHandler.h"
 #include "storm/utility/Stopwatch.h"
@@ -348,9 +348,17 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
         // Precompute initial bounds used for cut-offs and clipping
         if (belExplSettings.isInexactPreprocessingSet()) {
             STORM_LOG_WARN("Using inexact preprocessing for belief exploration can lead to inaccurate results.");
-            auto preprocessedPomdpDouble = storm::transformer::SparseModelValueTypeTransformer<ValueType, double>().transformModel(preprocessedPomdpPtr);
-            auto inExactPreProcessingMC = modelchecker::PreprocessingPomdpValueBoundsModelChecker<storm::models::sparse::Pomdp<double>>(
-                *preprocessedPomdpDouble->template as<storm::models::sparse::Pomdp<double>>());
+            std::shared_ptr<storm::models::sparse::Pomdp<double>> preprocessedPomdpDouble;
+            if constexpr (std::is_same_v<ValueType, storm::RationalNumber>) {
+                preprocessedPomdpDouble = storm::transformer::sparseRationalModelToDouble(
+                                              preprocessedPomdpPtr, storm::settings::getModule<storm::settings::modules::GeneralSettings>().getPrecision())
+                                              ->template as<storm::models::sparse::Pomdp<double>>();
+            } else {
+                STORM_LOG_WARN("Inexact preprocessing option has no effect for floating-point models.");
+                preprocessedPomdpDouble = preprocessedPomdpPtr;
+            }
+            auto inExactPreProcessingMC =
+                modelchecker::PreprocessingPomdpValueBoundsModelChecker<storm::models::sparse::Pomdp<double>>(*preprocessedPomdpDouble);
             beliefExplorationBounds.preprocessingBounds = inExactPreProcessingMC.getValueBounds(env, formula).template toValueType<ValueType>();
             if (belExplSettings.isUseClippingSet() && rewardModelName) {
                 beliefExplorationBounds.extremeBounds = inExactPreProcessingMC.getExtremeValueBound(env, formula).template toValueType<ValueType>();
