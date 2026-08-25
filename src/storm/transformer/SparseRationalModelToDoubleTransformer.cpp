@@ -1,4 +1,4 @@
-#include "SparseModelToDoubleTransformer.h"
+#include "SparseRationalModelToDoubleTransformer.h"
 
 #include "storm/exceptions/IllegalArgumentTypeException.h"
 #include "storm/models/sparse/Ctmc.h"
@@ -14,10 +14,15 @@
 
 namespace storm::transformer {
 std::shared_ptr<storm::models::sparse::Model<double>> sparseRationalModelToDouble(
-    std::shared_ptr<storm::models::sparse::Model<storm::RationalNumber>> const& inputModel) {
+    std::shared_ptr<storm::models::sparse::Model<storm::RationalNumber>> const& inputModel, double precision) {
     STORM_LOG_THROW(inputModel, storm::exceptions::IllegalArgumentTypeException, "Cannot transform a null model.");
     storm::storage::sparse::ModelComponents<double> convertedComponents;
     convertedComponents.transitionMatrix = inputModel->getTransitionMatrix().toValueType<double>();
+    if (inputModel->getType() != storm::models::ModelType::Ctmc) {
+        if (!convertedComponents.transitionMatrix.isProbabilistic(precision)) {
+            convertedComponents.transitionMatrix.divideRowsInPlace(convertedComponents.transitionMatrix.getRowSumVector());
+        }
+    }
     convertedComponents.choiceLabeling = inputModel->getOptionalChoiceLabeling();
     convertedComponents.stateLabeling = inputModel->getStateLabeling();
     convertedComponents.stateValuations = inputModel->getOptionalStateValuations();
@@ -63,8 +68,7 @@ std::shared_ptr<storm::models::sparse::Model<double>> sparseRationalModelToDoubl
                 resultVector.push_back(storm::utility::convertNumber<double>(oldValue));
             }
             convertedComponents.exitRates = resultVector;
-            // Markov automata store probabilities in their transition matrix and rates separately in exitRates.
-            convertedComponents.rateTransitions = false;
+            convertedComponents.rateTransitions = true;
             return std::make_shared<storm::models::sparse::Ctmc<double>>(storm::models::sparse::Ctmc<double>(convertedComponents));
         }
         case storm::models::ModelType::MarkovAutomaton: {
@@ -75,7 +79,8 @@ std::shared_ptr<storm::models::sparse::Model<double>> sparseRationalModelToDoubl
                 resultVector.push_back(storm::utility::convertNumber<double>(oldValue));
             }
             convertedComponents.exitRates = resultVector;
-            convertedComponents.rateTransitions = true;
+            // Markov automata store probabilities in their transition matrix and rates separately in exitRates.
+            convertedComponents.rateTransitions = false;
             convertedComponents.markovianStates = ma->getMarkovianStates();
             return std::make_shared<storm::models::sparse::MarkovAutomaton<double>>(storm::models::sparse::MarkovAutomaton<double>(convertedComponents));
         }
