@@ -8,21 +8,18 @@
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/models/sparse/Smg.h"
 #include "storm/models/sparse/StochasticTwoPlayerGame.h"
-#include "storm/settings/SettingsManager.h"
-#include "storm/settings/modules/GeneralSettings.h"
 #include "storm/storage/sparse/ModelComponents.h"
 #include "storm/utility/macros.h"
 #include "storm/utility/vector.h"
 
 namespace storm::transformer {
 std::shared_ptr<storm::models::sparse::Model<double>> sparseRationalModelToDouble(
-    std::shared_ptr<storm::models::sparse::Model<storm::RationalNumber>> const& inputModel) {
+    std::shared_ptr<storm::models::sparse::Model<storm::RationalNumber>> const& inputModel, double precision) {
     STORM_LOG_THROW(inputModel, storm::exceptions::IllegalArgumentTypeException, "Cannot transform a null model.");
     storm::storage::sparse::ModelComponents<double> convertedComponents;
     convertedComponents.transitionMatrix = inputModel->getTransitionMatrix().toValueType<double>();
     if (inputModel->getType() != storm::models::ModelType::Ctmc) {
-        if (auto const precision = storm::settings::getModule<storm::settings::modules::GeneralSettings>().getPrecision();
-            !convertedComponents.transitionMatrix.isProbabilistic(precision)) {
+        if (!convertedComponents.transitionMatrix.isProbabilistic(precision)) {
             convertedComponents.transitionMatrix.divideRowsInPlace(convertedComponents.transitionMatrix.getRowSumVector());
         }
     }
