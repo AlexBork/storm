@@ -170,7 +170,6 @@ TEST(BitVectorTest, Resize) {
 
     vector.resize(72, true);
 
-    std::cout << vector << std::endl;
     ASSERT_EQ(72ul, vector.size());
     ASSERT_EQ(34ul, vector.getNumberOfSetBits());
 
@@ -186,7 +185,7 @@ TEST(BitVectorTest, Resize) {
         ASSERT_TRUE(vector.get(i));
     }
 
-    vector.resize(16, 0);
+    vector.resize(16, false);
     ASSERT_EQ(16ul, vector.size());
     ASSERT_EQ(16ul, vector.getNumberOfSetBits());
 
@@ -194,7 +193,7 @@ TEST(BitVectorTest, Resize) {
         ASSERT_TRUE(vector.get(i));
     }
 
-    vector.resize(65, 1);
+    vector.resize(65, true);
     ASSERT_EQ(65ul, vector.size());
     ASSERT_TRUE(vector.full());
 }
@@ -285,7 +284,7 @@ TEST(BitVectorTest, OperatorXor) {
 
     storm::storage::BitVector vector3 = vector1 ^ vector2;
     storm::storage::BitVector vector4 = ~vector2;
-    storm::storage::BitVector vector5 = vector1 ^ vector1;
+    storm::storage::BitVector vector5 = vector1 ^ vector1;  // NOLINT(misc-redundant-expression)
 
     for (uint64_t i = 0; i < 32; ++i) {
         ASSERT_EQ(vector3.get(i), vector4.get(i));
