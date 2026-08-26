@@ -1,5 +1,6 @@
 #include "storm/transformer/TransitionToActionRewardTransformer.h"
 
+#include "storm/adapters/IntervalAdapter.h"
 #include "storm/adapters/RationalFunctionAdapter.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/exceptions/UnexpectedException.h"
@@ -15,15 +16,15 @@
 namespace storm::transformer {
 
 namespace detail {
-template<typename ValueType>
-using MultiRewardVector = std::vector<ValueType>;
+template<typename RewardValueType>
+using MultiRewardVector = std::vector<RewardValueType>;
 
-template<typename ValueType>
+template<typename ValueType, typename RewardModelType = storm::models::sparse::StandardRewardModel<ValueType>>
 class RewardTransitionIterator {
    public:
     RewardTransitionIterator(storm::storage::SparseMatrix<ValueType> const& m) : transitionMatrix(m) {}
 
-    void addRewardModel(storm::models::sparse::StandardRewardModel<ValueType> const& rewardModel) {
+    void addRewardModel(RewardModelType const& rewardModel) {
         if (rewardModel.hasTransitionRewards()) {
             transitionRewards.emplace_back(rewardModel.getTransitionRewardMatrix());
             STORM_LOG_ASSERT(transitionRewards.back()->isSubmatrixOf(transitionMatrix), "Invalid reward matrix.");
@@ -35,8 +36,8 @@ class RewardTransitionIterator {
     template<typename CallBackType>
     void forEachRowEntry(uint64_t rowIndex, bool skip0RewardEntries, CallBackType&& callBack) {
         // Set-up iterators
-        std::vector<typename storm::storage::SparseMatrix<ValueType>::const_iterator> rewardIterators;
-        std::vector<typename storm::storage::SparseMatrix<ValueType>::const_iterator> rewardIteratorsEnd;
+        std::vector<typename storm::storage::SparseMatrix<typename RewardModelType::ValueType>::const_iterator> rewardIterators;
+        std::vector<typename storm::storage::SparseMatrix<typename RewardModelType::ValueType>::const_iterator> rewardIteratorsEnd;
         for (auto const& rewardMatrix : transitionRewards) {
             if (rewardMatrix) {
                 rewardIterators.push_back(rewardMatrix->begin(rowIndex));
@@ -47,7 +48,7 @@ class RewardTransitionIterator {
             }
         }
 
-        std::vector<ValueType> rewards(transitionRewards.size());
+        std::vector<typename RewardModelType::ValueType> rewards(transitionRewards.size());
         for (auto const& entry : transitionMatrix.getRow(rowIndex)) {
             // Fill in rewards for this entry
             bool skipEntry = skip0RewardEntries;
@@ -57,7 +58,7 @@ class RewardTransitionIterator {
                     ++rewardIterators[i];
                     skipEntry = skipEntry && storm::utility::isZero(rewards[i]);
                 } else {
-                    rewards[i] = storm::utility::zero<ValueType>();
+                    rewards[i] = storm::utility::zero<typename RewardModelType::ValueType>();
                 }
             }
             if (!skipEntry) {
@@ -68,16 +69,17 @@ class RewardTransitionIterator {
 
    private:
     storm::storage::SparseMatrix<ValueType> const& transitionMatrix;
-    std::vector<storm::OptionalRef<storm::storage::SparseMatrix<ValueType> const>> transitionRewards;
+    std::vector<storm::OptionalRef<storm::storage::SparseMatrix<typename RewardModelType::ValueType> const>> transitionRewards;
 };
 
 }  // namespace detail
 
-template<typename ValueType>
-TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToActionRewards(
-    std::shared_ptr<storm::models::sparse::Model<ValueType>> originalModel, std::vector<std::string> const& relevantRewardModelNames) {
+template<typename ValueType, typename RewardModelType>
+TransitionToActionRewardTransformerReturnType<ValueType, RewardModelType> transformTransitionToActionRewards(
+    std::shared_ptr<storm::models::sparse::Model<ValueType, RewardModelType>> originalModel, std::vector<std::string> const& relevantRewardModelNames) {
+    using RewardValueType = RewardModelType::ValueType;
     STORM_LOG_ASSERT(originalModel, "Model must not be null.");
-    detail::RewardTransitionIterator<ValueType> rewardTransitionIterator(originalModel->getTransitionMatrix());
+    detail::RewardTransitionIterator<ValueType, RewardModelType> rewardTransitionIterator(originalModel->getTransitionMatrix());
     bool hasTransitionRewards = false;
     for (auto const& rewardModelName : relevantRewardModelNames) {
         auto const& rewardModel = originalModel->getRewardModel(rewardModelName);
@@ -87,24 +89,27 @@ TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToAc
         rewardTransitionIterator.addRewardModel(rewardModel);
     }
     if (!hasTransitionRewards) {
-        return {originalModel->template as<storm::models::sparse::Model<ValueType>>(),
+        return {originalModel->template as<storm::models::sparse::Model<ValueType, RewardModelType>>(),
                 {storm::utility::vector::buildVectorForRange<uint64_t>(0, originalModel->getNumberOfStates())}};
     }
 
-    // Make a pass to find the different rewards with which a state is entered
-    std::vector<std::set<detail::MultiRewardVector<ValueType>>> incomingRewards(originalModel->getNumberOfStates());
+    // Make a pass to find the different unique rewards with which a state is entered.
+    // We do not use std::set here as the interval ordering is not a strict weak ordering for overlapping intervals.
+    // Equality-based deduplication preserves distinct overlapping rewards.
+    std::vector<std::vector<detail::MultiRewardVector<RewardValueType>>> incomingRewards(originalModel->getNumberOfStates());
     auto const& transitions = originalModel->getTransitionMatrix();
     for (uint64_t row = 0; row < transitions.getRowCount(); ++row) {
         rewardTransitionIterator.forEachRowEntry(
-            row, true,
-            [&incomingRewards](uint64_t column, ValueType, detail::MultiRewardVector<ValueType> const& rewards) { incomingRewards[column].insert(rewards); });
+            row, true, [&incomingRewards](uint64_t column, RewardValueType, detail::MultiRewardVector<RewardValueType> const& rewards) {
+                storm::utility::vector::findOrInsert(incomingRewards[column], detail::MultiRewardVector<RewardValueType>(rewards));
+            });
     }
 
     // Create a mapping from original to new indices
     std::vector<uint64_t> originalToNewIndex;
     uint64_t numStates = 0;
-    for (auto const& incRewardsSet : incomingRewards) {
-        numStates += incRewardsSet.size();
+    for (auto const& incomingRewardVectors : incomingRewards) {
+        numStates += incomingRewardVectors.size();
         originalToNewIndex.push_back(numStates);
         ++numStates;
     }
@@ -115,19 +120,19 @@ TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToAc
     storm::storage::SparseMatrixBuilder<ValueType> newTransitionsBuilder(transitions.getRowCount() + numIntermediateStates, numStates,
                                                                          transitions.getEntryCount() + numIntermediateStates, true, useGroups,
                                                                          useGroups ? numStates : 0ull);
-    std::vector<std::vector<ValueType>> newActionRewards(relevantRewardModelNames.size(),
-                                                         std::vector<ValueType>(transitions.getRowCount() + numIntermediateStates));
+    std::vector<std::vector<RewardValueType>> newActionRewards(relevantRewardModelNames.size(),
+                                                               std::vector<RewardValueType>(transitions.getRowCount() + numIntermediateStates));
     uint64_t currNewRow = 0;
     for (uint64_t currOrigState = 0; currOrigState < originalModel->getNumberOfStates(); ++currOrigState) {
         uint64_t const currNewState = originalToNewIndex[currOrigState];
         // First add the transitions and rewards for the intermediate states
-        for (auto const& incRewardsSet : incomingRewards[currOrigState]) {
+        for (auto const& incomingRewardVector : incomingRewards[currOrigState]) {
             if (useGroups) {
                 newTransitionsBuilder.newRowGroup(currNewRow);
             }
             newTransitionsBuilder.addNextValue(currNewRow, currNewState, storm::utility::one<ValueType>());
             auto newRewIt = newActionRewards.begin();
-            for (auto const& rew : incRewardsSet) {
+            for (auto const& rew : incomingRewardVector) {
                 (*newRewIt)[currNewRow] = rew;
                 ++newRewIt;
             }
@@ -141,13 +146,13 @@ TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToAc
             rewardTransitionIterator.forEachRowEntry(
                 origRowIndex, false,
                 [&newTransitionsBuilder, &originalToNewIndex, &incomingRewards, &currNewRow](uint64_t column, ValueType prob,
-                                                                                             detail::MultiRewardVector<ValueType> const& rewards) {
-                    if (std::all_of(rewards.begin(), rewards.end(), [](ValueType const& r) { return storm::utility::isZero(r); })) {
-                        // No transition reward collected so use originial state
+                                                                                             detail::MultiRewardVector<RewardValueType> const& rewards) {
+                    if (std::all_of(rewards.begin(), rewards.end(), [](RewardValueType const& r) { return storm::utility::isZero(r); })) {
+                        // No transition reward collected so use original state
                         newTransitionsBuilder.addNextValue(currNewRow, originalToNewIndex[column], prob);
                     } else {
                         // Redirect to intermediate state
-                        auto incomingRewardsIt = incomingRewards[column].find(rewards);
+                        auto incomingRewardsIt = std::find(incomingRewards[column].begin(), incomingRewards[column].end(), rewards);
                         STORM_LOG_ASSERT(incomingRewardsIt != incomingRewards[column].end(), "Invalid incoming rewards.");
                         uint64_t const intermediateStateIndex =
                             originalToNewIndex[column] - incomingRewards[column].size() + std::distance(incomingRewards[column].begin(), incomingRewardsIt);
@@ -166,7 +171,7 @@ TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToAc
             newLabeling.addLabelToState(l, originalToNewIndex[origIndex]);
         }
     }
-    storm::storage::sparse::ModelComponents<ValueType> components(newTransitionsBuilder.build(), std::move(newLabeling));
+    storm::storage::sparse::ModelComponents<ValueType, RewardModelType> components(newTransitionsBuilder.build(), std::move(newLabeling));
 
     // create new reward models
     uint64_t rewardIndex = 0;
@@ -188,7 +193,7 @@ TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToAc
                 }
             }
         }
-        storm::models::sparse::StandardRewardModel<ValueType> newRewardModel(std::nullopt, std::move(newActionRewardVector));
+        RewardModelType newRewardModel(std::nullopt, std::move(newActionRewardVector));
         components.rewardModels.emplace(rewardModelName, std::move(newRewardModel));
     }
 
@@ -221,12 +226,32 @@ TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToAc
 template struct TransitionToActionRewardTransformerReturnType<double>;
 template struct TransitionToActionRewardTransformerReturnType<storm::RationalNumber>;
 template struct TransitionToActionRewardTransformerReturnType<storm::RationalFunction>;
+template struct TransitionToActionRewardTransformerReturnType<storm::Interval>;
+template struct TransitionToActionRewardTransformerReturnType<storm::RationalInterval>;
+template struct TransitionToActionRewardTransformerReturnType<double, storm::models::sparse::StandardRewardModel<storm::Interval>>;
+template struct TransitionToActionRewardTransformerReturnType<storm::RationalNumber, storm::models::sparse::StandardRewardModel<storm::RationalInterval>>;
 
-template TransitionToActionRewardTransformerReturnType<double> transformTransitionToActionRewards(
+template TransitionToActionRewardTransformerReturnType<double> transformTransitionToActionRewards<double, storm::models::sparse::StandardRewardModel<double>>(
     std::shared_ptr<storm::models::sparse::Model<double>> originalModel, std::vector<std::string> const& relevantRewardModelNames);
-template TransitionToActionRewardTransformerReturnType<storm::RationalNumber> transformTransitionToActionRewards(
+template TransitionToActionRewardTransformerReturnType<storm::RationalNumber>
+transformTransitionToActionRewards<storm::RationalNumber, storm::models::sparse::StandardRewardModel<storm::RationalNumber>>(
     std::shared_ptr<storm::models::sparse::Model<storm::RationalNumber>> originalModel, std::vector<std::string> const& relevantRewardModelNames);
-template TransitionToActionRewardTransformerReturnType<storm::RationalFunction> transformTransitionToActionRewards(
+template TransitionToActionRewardTransformerReturnType<storm::RationalFunction>
+transformTransitionToActionRewards<storm::RationalFunction, storm::models::sparse::StandardRewardModel<storm::RationalFunction>>(
     std::shared_ptr<storm::models::sparse::Model<storm::RationalFunction>> originalModel, std::vector<std::string> const& relevantRewardModelNames);
+template TransitionToActionRewardTransformerReturnType<storm::Interval>
+transformTransitionToActionRewards<storm::Interval, storm::models::sparse::StandardRewardModel<storm::Interval>>(
+    std::shared_ptr<storm::models::sparse::Model<storm::Interval>> originalModel, std::vector<std::string> const& relevantRewardModelNames);
+template TransitionToActionRewardTransformerReturnType<storm::RationalInterval>
+transformTransitionToActionRewards<storm::RationalInterval, storm::models::sparse::StandardRewardModel<storm::RationalInterval>>(
+    std::shared_ptr<storm::models::sparse::Model<storm::RationalInterval>> originalModel, std::vector<std::string> const& relevantRewardModelNames);
+template TransitionToActionRewardTransformerReturnType<double, storm::models::sparse::StandardRewardModel<storm::Interval>>
+transformTransitionToActionRewards<double, storm::models::sparse::StandardRewardModel<storm::Interval>>(
+    std::shared_ptr<storm::models::sparse::Model<double, storm::models::sparse::StandardRewardModel<storm::Interval>>> originalModel,
+    std::vector<std::string> const& relevantRewardModelNames);
+template TransitionToActionRewardTransformerReturnType<storm::RationalNumber, storm::models::sparse::StandardRewardModel<storm::RationalInterval>>
+transformTransitionToActionRewards<storm::RationalNumber, storm::models::sparse::StandardRewardModel<storm::RationalInterval>>(
+    std::shared_ptr<storm::models::sparse::Model<storm::RationalNumber, storm::models::sparse::StandardRewardModel<storm::RationalInterval>>> originalModel,
+    std::vector<std::string> const& relevantRewardModelNames);
 
 }  // namespace storm::transformer

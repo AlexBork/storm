@@ -9,9 +9,9 @@
 
 namespace storm::transformer {
 
-template<typename ValueType>
+template<typename ValueType, typename RewardModelType = storm::models::sparse::StandardRewardModel<ValueType>>
 struct TransitionToActionRewardTransformerReturnType {
-    std::shared_ptr<storm::models::sparse::Model<ValueType>> model;
+    std::shared_ptr<storm::models::sparse::Model<ValueType, RewardModelType>> model;
     std::vector<uint64_t> originalToNewStateIndices;
 };
 /*!
@@ -35,8 +35,14 @@ struct TransitionToActionRewardTransformerReturnType {
  * @param relevantRewardModelNames The names of the reward models that should be transformed. Error if the model does not contain a reward model with this name.
  * @return The transformed model and the positions of the original model states in the new (larger) transformed model.
  */
+template<typename ValueType, typename RewardModelType>
+TransitionToActionRewardTransformerReturnType<ValueType, RewardModelType> transformTransitionToActionRewards(
+    std::shared_ptr<storm::models::sparse::Model<ValueType, RewardModelType>> originalModel, std::vector<std::string> const& relevantRewardModelNames);
+
 template<typename ValueType>
 TransitionToActionRewardTransformerReturnType<ValueType> transformTransitionToActionRewards(
-    std::shared_ptr<storm::models::sparse::Model<ValueType>> originalModel, std::vector<std::string> const& relevantRewardModelNames);
+    std::shared_ptr<storm::models::sparse::Model<ValueType>> originalModel, std::vector<std::string> const& relevantRewardModelNames) {
+    return transformTransitionToActionRewards<ValueType, storm::models::sparse::StandardRewardModel<ValueType>>(originalModel, relevantRewardModelNames);
+}
 
 }  // namespace storm::transformer
