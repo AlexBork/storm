@@ -903,6 +903,30 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmin) {
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
 }
 
+TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmin_early_clipping_is_sound) {
+    typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
+    typedef typename TestFixture::POMDPValueType POMDPValueType;
+    typedef typename TestFixture::BeliefValueType BeliefValueType;
+    typedef typename TestFixture::BeliefMDPValueType BeliefMDPValueType;
+
+    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmin=? [F \"goal\" ]", "slippery=0");
+    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, BeliefValueType, BeliefMDPValueType> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<POMDPType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> precomputedBeliefBounds;
+    precomputedBeliefBounds.preprocessingBounds = preprocessChecker.getValueBounds(this->env(), *data.formula);
+
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+    options.maxExplorationSize = 1;
+    options.useClipping = true;
+    options.clippingResolutions = std::vector<uint64_t>(data.model->getNrObservations(), 2);
+
+    auto underResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto expected = this->template parseNumber<BeliefMDPValueType>("3/10");
+    EXPECT_GE(underResult.first, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
+}
+
 TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_slippery_Pmax) {
     typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
     typedef typename TestFixture::POMDPValueType POMDPValueType;

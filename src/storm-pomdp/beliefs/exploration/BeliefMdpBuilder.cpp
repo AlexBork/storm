@@ -5,6 +5,7 @@
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/models/sparse/Mdp.h"
 #include "storm/models/sparse/StandardRewardModel.h"
+#include "storm/solver/OptimizationDirection.h"
 #include "storm/storage/SparseMatrix.h"
 #include "storm/storage/sparse/ModelComponents.h"
 
@@ -161,7 +162,11 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
 
                         if (clippingProbability) {
                             if (isReachProb) {
-                                probabilityToBottom += *clippingProbability;
+                                if (storm::solver::minimize(propertyInformation.dir)) {
+                                    probabilityToTarget += *clippingProbability;
+                                } else {
+                                    probabilityToBottom += *clippingProbability;
+                                }
                             } else if (rewardPenalty) {
                                 if (storm::utility::isInfinity(*rewardPenalty)) {
                                     /* Infinite reward on transitions is not correctly handled by the model checker. Therefore, we treat it by adding a
