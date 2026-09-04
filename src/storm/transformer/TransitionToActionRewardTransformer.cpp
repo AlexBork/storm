@@ -201,7 +201,7 @@ TransitionToActionRewardTransformerReturnType<ValueType, RewardModelType> transf
                 newStateRewards.value()[newState] = oldRewardModel.getStateReward(origState);
             }
         }
-        RewardModelType newRewardModel(newStateRewards, std::move(newActionRewardVector));
+        RewardModelType newRewardModel(std::move(newStateRewards), std::move(newActionRewardVector));
         components.rewardModels.emplace(rewardModelName, std::move(newRewardModel));
     }
 
