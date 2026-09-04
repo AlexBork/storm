@@ -5,6 +5,7 @@
 #include "storm-pomdp/beliefs/storage/BeliefBuilder.h"
 #include "storm-pomdp/beliefs/utility/BeliefNumerics.h"
 #include "storm/adapters/RationalNumberAdapter.h"
+#include "storm/exceptions/UnexpectedException.h"
 #include "storm/solver/LpSolver.h"
 #include "storm/storage/expressions/Expression.h"
 #include "storm/storage/expressions/ExpressionManager.h"
@@ -159,24 +160,20 @@ typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbs
             ++i;
         });
 
-        if (BeliefNumerics<BeliefValueType>::isZero(optDelta)) {
-            // If we get an optimal value of 0, the LP solver considers two beliefs to be equal, possibly due to numerical instability
-            // For a sound result, we consider the state to not be clippable
-            STORM_LOG_WARN("LP solver returned an optimal value of 0. This should definitely not happen when using a grid");
-            STORM_LOG_WARN("Origin" << belief.toString());
-            STORM_LOG_WARN("Target [Bel " << targetBelief.toString());
-            return BeliefClipping{false, std::move(targetBelief), storm::utility::zero<BeliefValueType>(), {}, false};
-        }
+        // If we get an optimal value of 0, the LP solver considers two beliefs to be equal, possibly due to numerical instability
+        // To prevent infinite expansion, we throw an exception.
+        STORM_LOG_THROW(!BeliefNumerics<BeliefValueType>::isZero(optDelta), storm::exceptions::UnexpectedException,
+                        "Grid clipping LP returned a clipping value of zero for distinct beliefs. This may be due to numeric instability."
+                        "Origin: "
+                            << belief.toString() << ", target: " << targetBelief.toString() << ", delta sum: " << deltaSum << ".");
 
-        if (optDelta == storm::utility::one<BeliefValueType>()) {
-            STORM_LOG_WARN("LP solver returned an optimal value of 1. Sum of state clipping values is " << deltaSum);
-            // If we get an optimal value of 1, we cannot clip the belief as by definition this would correspond to a division by 0.
-            STORM_LOG_DEBUG("Origin " << belief.toString());
-            STORM_LOG_DEBUG("Target " << targetBelief.toString());
+        if (BeliefNumerics<BeliefValueType>::isOne(optDelta)) {
+            STORM_LOG_THROW(!BeliefNumerics<BeliefValueType>::isOne(deltaSum), storm::exceptions::UnexpectedException,
+                            "Grid clipping LP returned a clipping value of one, leaving no retained probability. Origin: "
+                                << belief.toString() << ", target: " << targetBelief.toString() << ", objective: " << optDelta << ", delta sum: " << deltaSum
+                                << ".");
 
-            if (deltaSum == storm::utility::one<BeliefValueType>()) {
-                return BeliefClipping{false, std::move(targetBelief), storm::utility::zero<BeliefValueType>(), {}, false};
-            }
+            // Recover from a rounded objective using the reconstructed value.
             optDelta = deltaSum;
         }
         STORM_LOG_TRACE("Clip " << belief.toString() << " to " << targetBelief.toString() << " with value " << optDelta);
