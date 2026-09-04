@@ -100,7 +100,7 @@ TransitionToActionRewardTransformerReturnType<ValueType, RewardModelType> transf
     auto const& transitions = originalModel->getTransitionMatrix();
     for (uint64_t row = 0; row < transitions.getRowCount(); ++row) {
         rewardTransitionIterator.forEachRowEntry(
-            row, true, [&incomingRewards](uint64_t column, RewardValueType, detail::MultiRewardVector<RewardValueType> const& rewards) {
+            row, true, [&incomingRewards](uint64_t column, ValueType, detail::MultiRewardVector<RewardValueType> const& rewards) {
                 storm::utility::vector::findOrInsert(incomingRewards[column], detail::MultiRewardVector<RewardValueType>(rewards));
             });
     }
@@ -185,7 +185,7 @@ TransitionToActionRewardTransformerReturnType<ValueType, RewardModelType> transf
             uint64_t const numRowsInGroup = useGroups ? transitions.getRowGroupSize(oldState) : 1ull;
             for (uint64_t groupOffset = 0; groupOffset < numRowsInGroup; ++groupOffset) {
                 auto& rewValue = newActionRewardVector[newStartRow + groupOffset];
-                if (oldRewardModel.hasStateRewards()) {
+                if (originalModel->isDiscreteTimeModel() && oldRewardModel.hasStateRewards()) {
                     rewValue += oldRewardModel.getStateReward(oldState);
                 }
                 if (oldRewardModel.hasStateActionRewards()) {
@@ -193,7 +193,15 @@ TransitionToActionRewardTransformerReturnType<ValueType, RewardModelType> transf
                 }
             }
         }
-        RewardModelType newRewardModel(std::nullopt, std::move(newActionRewardVector));
+        std::optional<std::vector<typename RewardModelType::ValueType>> newStateRewards;
+        if (!originalModel->isDiscreteTimeModel() && oldRewardModel.hasStateRewards()) {
+            newStateRewards.emplace(numStates, storm::utility::zero<ValueType>());
+            for (uint64_t origState = 0; origState < originalModel->getNumberOfStates(); ++origState) {
+                uint64_t const newState = originalToNewIndex[origState];
+                newStateRewards.value()[newState] = oldRewardModel.getStateReward(origState);
+            }
+        }
+        RewardModelType newRewardModel(newStateRewards, std::move(newActionRewardVector));
         components.rewardModels.emplace(rewardModelName, std::move(newRewardModel));
     }
 
