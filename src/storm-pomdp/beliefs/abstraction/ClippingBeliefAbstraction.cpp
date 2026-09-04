@@ -9,6 +9,7 @@
 #include "storm/solver/LpSolver.h"
 #include "storm/storage/expressions/Expression.h"
 #include "storm/storage/expressions/ExpressionManager.h"
+#include "storm/utility/constants.h"
 #include "storm/utility/solver.h"
 
 namespace storm::pomdp::beliefs {
@@ -163,15 +164,15 @@ typename ClippingBeliefAbstraction<BeliefType>::BeliefClipping ClippingBeliefAbs
         // If we get an optimal value of 0, the LP solver considers two beliefs to be equal, possibly due to numerical instability
         // To prevent infinite expansion, we throw an exception.
         STORM_LOG_THROW(!BeliefNumerics<BeliefValueType>::isZero(optDelta), storm::exceptions::UnexpectedException,
-                        "Grid clipping LP returned a clipping value of zero for distinct beliefs. This may be due to numeric instability."
-                        "Origin: "
-                            << belief.toString() << ", target: " << targetBelief.toString() << ", delta sum: " << deltaSum << ".");
+                        "Grid clipping LP returned a clipping value of zero for distinct beliefs. This may be due to numeric instability. Origin: "
+                            << belief.toString(false, true) << ", target: " << targetBelief.toString(false, true)
+                            << ", objective: " << storm::utility::to_string(optDelta) << ", delta sum: " << storm::utility::to_string(deltaSum) << ".");
 
         if (BeliefNumerics<BeliefValueType>::isOne(optDelta)) {
             STORM_LOG_THROW(!BeliefNumerics<BeliefValueType>::isOne(deltaSum), storm::exceptions::UnexpectedException,
                             "Grid clipping LP returned a clipping value of one, leaving no retained probability. Origin: "
-                                << belief.toString() << ", target: " << targetBelief.toString() << ", objective: " << optDelta << ", delta sum: " << deltaSum
-                                << ".");
+                                << belief.toString(false, true) << ", target: " << targetBelief.toString(false, true)
+                                << ", objective: " << storm::utility::to_string(optDelta) << ", delta sum: " << storm::utility::to_string(deltaSum) << ".");
 
             // Recover from a rounded objective using the reconstructed value.
             optDelta = deltaSum;

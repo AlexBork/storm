@@ -54,13 +54,27 @@ bool Belief<ValueType>::operator==(Belief const& other) const {
 }
 
 template<typename ValueType>
-std::string Belief<ValueType>::toString(bool convertToDouble) const {
+std::string Belief<ValueType>::toString(bool convertToDouble, bool fullPrecision) const {
     std::stringstream ss;
     ss << "Belief{ obs:" << obs;
     if (convertToDouble) {
-        forEach([&ss](auto const& state, auto const& val) { ss << ", " << state << ":" << storm::utility::convertNumber<double>(val); });
+        forEach([&ss, fullPrecision](auto const& state, auto const& val) {
+            ss << ", " << state << ":";
+            if (fullPrecision) {
+                ss << storm::utility::to_string(storm::utility::convertNumber<double>(val));
+            } else {
+                ss << storm::utility::convertNumber<double>(val);
+            }
+        });
     } else {
-        forEach([&ss](auto const& state, auto const& val) { ss << ", " << state << ":" << val; });
+        forEach([&ss, fullPrecision](auto const& state, auto const& val) {
+            ss << ", " << state << ":";
+            if (fullPrecision) {
+                ss << storm::utility::to_string(val);
+            } else {
+                ss << val;
+            }
+        });
     }
     ss << " }";
     return ss.str();

@@ -53,8 +53,9 @@ class Belief {
      * A (human-readable) string representation of this belief
      * @param convertToDouble if true, numbers are converted to double before printing. If this has ValueType=RationalNumber, the output as double is readable
      * but potentially imprecise
+     * @param fullPrecision if true, numbers are printed with full precision
      */
-    std::string toString(bool convertToDouble = true) const;
+    std::string toString(bool convertToDouble = true, bool fullPrecision = false) const;
 
     /*!
      * @param summands a vector containing a value for each state of the underlying POMDP.
