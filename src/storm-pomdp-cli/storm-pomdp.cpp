@@ -533,11 +533,16 @@ bool performAnalysis(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> co
     }
     if (pomdpSettings.isCheckFullyObservableSet()) {
         STORM_PRINT_AND_LOG("Analyzing the formula on the fully observable MDP ... ");
-        auto resultPtr = storm::api::verifyWithSparseEngine<ValueType>(pomdp->template as<storm::models::sparse::Mdp<ValueType>>(),
-                                                                       storm::api::createTask<ValueType>(formula.asSharedPointer(), true));
+        // To avoid any problems resulting from stale components which remain after a cast, we instead build the underlying MDP
+        storm::storage::sparse::ModelComponents<ValueType> components(pomdp->getTransitionMatrix(), pomdp->getStateLabeling(), pomdp->getRewardModels());
+        components.choiceLabeling = pomdp->getOptionalChoiceLabeling();
+        components.stateValuations = pomdp->getOptionalStateValuations();
+        components.choiceOrigins = pomdp->getOptionalChoiceOrigins();
+        auto fullyObservableMdp = std::make_shared<storm::models::sparse::Mdp<ValueType>>(std::move(components));
+        auto resultPtr = storm::api::verifyWithSparseEngine<ValueType>(fullyObservableMdp, storm::api::createTask<ValueType>(formula.asSharedPointer(), true));
         if (resultPtr) {
             auto result = resultPtr->template asExplicitQuantitativeCheckResult<ValueType>();
-            result.filter(storm::modelchecker::ExplicitQualitativeCheckResult<ValueType>(pomdp->getInitialStates()));
+            result.filter(storm::modelchecker::ExplicitQualitativeCheckResult<ValueType>(fullyObservableMdp->getInitialStates()));
             if (storm::utility::resources::isTerminate()) {
                 STORM_PRINT_AND_LOG("\nResult till abort: ");
             } else {
