@@ -485,7 +485,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             revisedOptions.clippingResolutions = std::vector<uint64_t>(preprocessedPomdpPtr->getNrObservations(), belExplSettings.getClippingGridResolution());
         }
         isUnderApproximation = true;
-        auto checkResult = [&]() -> typename BeliefBasedChecker::BeliefBasedModelCheckerResult {
+        auto checkResult = [&]() -> beliefs::BeliefBasedModelCheckerResult<BeliefMDPType> {
             if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
                 std::vector<std::string> relevantRewardModelNames;
                 for (auto const& rewardBound : propertyInfo.rewardBounds) {

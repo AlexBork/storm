@@ -172,12 +172,12 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
 
 template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType, typename PolicyValueType, typename AbstractionType,
          typename InfoType = StandardExplorationInformation<BeliefMdpValueType, BeliefType>>
-BeliefBasedModelCheckerResult<BeliefMdpValueType> checkUnfoldOrDiscretize(
+BeliefBasedModelCheckerResult<BeliefMdpValueType, PolicyValueType> checkUnfoldOrDiscretize(
     storm::Environment const& env, PomdpModelType const& pomdp, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, storm::OptionalRef<AbstractionType> abstraction = {}) {
     BeliefBasedModelCheckerStatistics statistics;
-    std::optional<typename CheckerType::BeliefBasedModelCheckerResult::PolicyType> generatedPolicy;
+    std::optional<storm::pomdp::policy::ObservationBasedFiniteStateController<PolicyValueType>> generatedPolicy;
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::ReachabilityProbability ||
                          propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward,
                      "Unexpected kind of property.");
@@ -291,7 +291,7 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> checkUnfoldOrDiscretize(
 }
 
 template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueType, typename PolicyValueType>
-BeliefBasedModelCheckerResult<BeliefMdpValueType> checkRewardAwareUnfoldOrDiscretize(
+BeliefBasedModelCheckerResult<BeliefMdpValueType, PolicyValueType> checkRewardAwareUnfoldOrDiscretize(
     storm::Environment const& env, PomdpModelType const& pomdp, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
@@ -398,7 +398,8 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> checkRewardAwareUnfoldOrDiscre
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
-BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkUnfold(
+BeliefBasedModelCheckerResult<BeliefMdpValueType, PolicyValueType>
+BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkUnfold(
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storm::pomdp::storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds) {
@@ -413,7 +414,8 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpM
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
-BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkDiscretize(
+BeliefBasedModelCheckerResult<BeliefMdpValueType, PolicyValueType>
+BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkDiscretize(
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds) {
@@ -425,7 +427,8 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpM
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
-BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkRewardAwareUnfold(
+BeliefBasedModelCheckerResult<BeliefMdpValueType, PolicyValueType>
+BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkRewardAwareUnfold(
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames) {
@@ -441,7 +444,8 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpM
 }
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
-BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkRewardAwareDiscretize(
+BeliefBasedModelCheckerResult<BeliefMdpValueType, PolicyValueType>
+BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::checkRewardAwareDiscretize(
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames) {
