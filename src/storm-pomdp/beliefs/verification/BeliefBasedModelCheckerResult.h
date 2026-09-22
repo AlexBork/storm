@@ -26,9 +26,7 @@ struct BeliefBasedModelCheckerStatistics {
 /** Result of a belief-based model-checking run. */
 template<typename BeliefMdpValueType>
 struct BeliefBasedModelCheckerResult {
-    using ValueType = storm::utility::ExtendedValueType<BeliefMdpValueType>;
-
-    ValueType value;
+    storm::utility::ExtendedValueType<BeliefMdpValueType> value;
     bool completedExploration;
     BeliefBasedModelCheckerStatistics statistics;
 };
