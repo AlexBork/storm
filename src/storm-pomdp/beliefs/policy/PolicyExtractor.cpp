@@ -11,8 +11,8 @@
 
 namespace storm::pomdp::policy {
 
-template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
-PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::PolicyExtractor(
+template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
+PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::PolicyExtractor(
     PomdpModelType const& pomdp, BeliefMdpType const& beliefMdp, std::unordered_map<uint64_t, uint32_t> const& beliefStateToObservationMap,
     storm::storage::Scheduler<BeliefMdpValueType> const& beliefMdpScheduler,
     std::optional<std::vector<storm::storage::Scheduler<typename PomdpModelType::ValueType>>> const& pomdpApproximationSchedulers,
@@ -26,9 +26,9 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::PolicyExtr
     // Intentionally left empty
 }
 
-template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
-ObservationBasedFiniteStateController<typename PomdpModelType::ValueType>
-PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPolicyAsFiniteStateController() const {
+template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
+ObservationBasedFiniteStateController<PolicyValueType>
+PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::exportPolicyAsFiniteStateController() const {
     std::optional<std::unordered_map<uint64_t, std::string>> optionalIdToObservationName = std::nullopt;
     std::optional<std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::string>>> optionalIdToActionNameMap = std::nullopt;
     if (pomdp.hasObservationValuations()) {
@@ -73,7 +73,7 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPoli
         }
         optionalIdToActionNameMap = idToActionNameMap;
     }
-    ObservationBasedFiniteStateController<typename PomdpModelType::ValueType> fsc(0ul, optionalIdToObservationName, optionalIdToActionNameMap);
+    ObservationBasedFiniteStateController<PolicyValueType> fsc(0ul, optionalIdToObservationName, optionalIdToActionNameMap);
 
     std::unordered_map<uint64_t, uint64_t> beliefStateToFscNodeMap;
     std::unordered_map<uint64_t, uint64_t> cutoffPolicyToFscNodeMap;
@@ -143,9 +143,9 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPoli
     return fsc;
 }
 
-template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
+template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
 std::shared_ptr<storm::models::sparse::Model<BeliefMdpValueType>>
-PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPolicyAsInducedMarkovChain() const {
+PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::exportPolicyAsInducedMarkovChain() const {
     storm::models::sparse::StateLabeling newLabeling(beliefMdp.getStateLabeling());
     if (pomdpApproximationSchedulers.has_value()) {
         for (uint64_t i = 0; i < pomdpApproximationSchedulers->size(); ++i) {
@@ -204,11 +204,11 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPoli
     return std::static_pointer_cast<storm::models::sparse::Model<BeliefMdpValueType>>(inducedMC);
 }
 
-template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
-std::unordered_map<uint64_t, storm::storage::Distribution<typename PomdpModelType::ValueType, uint64_t>>
-PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::pomdpSchedulerToObservationBasedMap(
+template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType>
+std::unordered_map<uint64_t, storm::storage::Distribution<PolicyValueType, uint64_t>>
+PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValueType>::pomdpSchedulerToObservationBasedMap(
     storm::storage::Scheduler<typename PomdpModelType::ValueType> const& scheduler) const {
-    std::unordered_map<uint64_t, storm::storage::Distribution<typename PomdpModelType::ValueType, uint64_t>> result;
+    std::unordered_map<uint64_t, storm::storage::Distribution<PolicyValueType, uint64_t>> result;
 
     // Iterate all POMDP states and group by observation id.
     const uint64_t numStates = pomdp.getNumberOfStates();
@@ -222,15 +222,8 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::pomdpSched
         }
 
         // Build distribution from the scheduler choice for this state.
-        const auto& choice = scheduler.getChoice(state);
-        storm::storage::Distribution<typename PomdpModelType::ValueType, uint64_t> dist;
-
-        if (choice.isDeterministic()) {
-            uint64_t action = choice.getDeterministicChoice();
-            dist.addProbability(action, 1);
-        } else {
-            dist = choice.getChoiceAsDistribution();
-        }
+        auto choice = scheduler.getChoice(state).template toValueType<PolicyValueType>();
+        storm::storage::Distribution<PolicyValueType, uint64_t> dist = choice.getChoiceAsDistribution();
 
         result.emplace(obs, std::move(dist));
     }
@@ -243,5 +236,6 @@ template class PolicyExtractor<storm::models::sparse::Pomdp<double>, storm::Rati
 template class PolicyExtractor<storm::models::sparse::Pomdp<storm::RationalNumber>, storm::RationalNumber, storm::RationalNumber>;
 template class PolicyExtractor<storm::models::sparse::Pomdp<storm::RationalNumber>, storm::RationalNumber, double>;
 template class PolicyExtractor<storm::models::sparse::Pomdp<double>, double, storm::RationalNumber>;
+template class PolicyExtractor<storm::models::sparse::Pomdp<double>, double, double, storm::RationalNumber>;
 
 }  // namespace storm::pomdp::policy

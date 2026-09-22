@@ -16,7 +16,7 @@ template<typename ValueType>
 class Scheduler;
 }
 namespace pomdp::policy {
-template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
+template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType, typename PolicyValueType = BeliefMdpValueType>
 class PolicyExtractor {
     using BeliefType = storm::pomdp::beliefs::Belief<BeliefValueType>;
     using BeliefMdpType = storm::models::sparse::Mdp<BeliefMdpValueType, storm::models::sparse::StandardRewardModel<BeliefMdpValueType>>;
@@ -29,12 +29,12 @@ class PolicyExtractor {
         std::optional<std::vector<storm::storage::Scheduler<typename PomdpModelType::ValueType>>> const& pomdpApproximationSchedulers = std::nullopt,
         PomdpModelType const* preprocessedPomdp = nullptr);
 
-    ObservationBasedFiniteStateController<typename PomdpModelType::ValueType> exportPolicyAsFiniteStateController() const;
+    ObservationBasedFiniteStateController<PolicyValueType> exportPolicyAsFiniteStateController() const;
 
     std::shared_ptr<ModelType> exportPolicyAsInducedMarkovChain() const;
 
    private:
-    std::unordered_map<uint64_t, storm::storage::Distribution<typename PomdpModelType::ValueType, uint64_t>> pomdpSchedulerToObservationBasedMap(
+    std::unordered_map<uint64_t, storm::storage::Distribution<PolicyValueType, uint64_t>> pomdpSchedulerToObservationBasedMap(
         storm::storage::Scheduler<typename PomdpModelType::ValueType> const& scheduler) const;
 
     PomdpModelType const& pomdp;

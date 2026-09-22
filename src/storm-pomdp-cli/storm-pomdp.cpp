@@ -438,7 +438,8 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     STORM_LOG_THROW(!policyExportRequested || propertyInfo.kind != beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability,
                     storm::exceptions::InvalidSettingsException, "Policy export is not supported for reward-aware belief exploration.");
 
-    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>, BeliefType, BeliefMDPType> checker(*preprocessedPomdpPtr);
+    using BeliefBasedChecker = storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>, BeliefType, BeliefMDPType>;
+    BeliefBasedChecker checker(*preprocessedPomdpPtr);
     ExtendedBeliefMDPType overResultValue;
     ExtendedBeliefMDPType underResultValue;
     bool isOverApproximation{false};
@@ -484,7 +485,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             revisedOptions.clippingResolutions = std::vector<uint64_t>(preprocessedPomdpPtr->getNrObservations(), belExplSettings.getClippingGridResolution());
         }
         isUnderApproximation = true;
-        auto checkResult = [&]() -> typename storm::pomdp::beliefs::BeliefBasedModelCheckerResult<BeliefMDPType> {
+        auto checkResult = [&]() -> typename BeliefBasedChecker::BeliefBasedModelCheckerResult {
             if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
                 std::vector<std::string> relevantRewardModelNames;
                 for (auto const& rewardBound : propertyInfo.rewardBounds) {

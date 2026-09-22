@@ -360,8 +360,9 @@ using PolicyGeneratingBeliefBasedModelCheckerTest = BeliefBasedModelCheckerTest<
 
 TEST_F(PolicyGeneratingBeliefBasedModelCheckerTest, GeneratesPolicyForUnfolding) {
     using POMDPType = storm::models::sparse::Pomdp<double>;
+    using PolicyValueType = storm::RationalNumber;
     auto data = buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
-    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, double, double> checker(*data.model);
+    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, double, double, PolicyValueType> checker(*data.model);
     storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<POMDPType> preprocessChecker(*data.model);
 
     storm::pomdp::storage::BeliefExplorationBounds<double> precomputedBeliefBounds;
@@ -381,6 +382,10 @@ TEST_F(PolicyGeneratingBeliefBasedModelCheckerTest, GeneratesPolicyForUnfolding)
     auto const& policy = *checkResult.policy;
     uint64_t const initialObservation = data.model->getObservation(data.model->getInitialStates().getNextSetIndex(0));
     EXPECT_TRUE(policy.hasOutputForObservationInNode(policy.getInitialNodeId(), initialObservation));
+
+    auto inducedDtmc = storm::pomdp::policy::applyObservationBasedFSCToPomdp(*data.model, policy, true);
+    EXPECT_GT(inducedDtmc.getNumberOfStates(), 0ul);
+    EXPECT_TRUE(inducedDtmc.getTransitionMatrix().isProbabilistic(1e-12));
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmax) {

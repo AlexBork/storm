@@ -108,6 +108,7 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
             actionDistribution.addProbability(0ul, storm::utility::one<FscValueType>());
         }
         for (auto const& actionEntry : actionDistribution) {
+            auto const actionProbability = storm::utility::convertNumber<PomdpValueType>(actionEntry.second);
             uint64_t pomdpActionId = actionEntry.first;
             if (fscActionIdToPomdpActionIdMap) {
                 STORM_LOG_THROW(fscActionIdToPomdpActionIdMap->contains(fscObservationId) &&
@@ -124,7 +125,7 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
                 // We take the expected reward over the action distribution, so not all properties are preserved.
                 if (rewardModel.hasStateActionRewards()) {
                     uint64_t globalActionIndex = pomdp.getTransitionMatrix().getRowGroupIndices()[currentPomdpState] + pomdpActionId;
-                    stateRewards[rewardModelName][currentStateId] += rewardModel.getStateActionRewardVector()[globalActionIndex] * actionEntry.second;
+                    stateRewards[rewardModelName][currentStateId] += rewardModel.getStateActionRewardVector()[globalActionIndex] * actionProbability;
                 }
                 if (rewardModel.hasTransitionRewards()) {
                     STORM_LOG_WARN("Transition rewards are not supported when applying an FSC to a POMDP. They will be ignored.");
@@ -149,9 +150,9 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
                 }
                 if (transitionProbabilities.contains(currentStateId) && transitionProbabilities[currentStateId].contains(successorNewStateId)) {
                     // Add transition from currentStateId to successorNewStateId with probability from POMDP
-                    transitionProbabilities[currentStateId][successorNewStateId] += transitionEntry.getValue() * actionEntry.second;
+                    transitionProbabilities[currentStateId][successorNewStateId] += transitionEntry.getValue() * actionProbability;
                 } else {
-                    transitionProbabilities[currentStateId][successorNewStateId] = transitionEntry.getValue() * actionEntry.second;
+                    transitionProbabilities[currentStateId][successorNewStateId] = transitionEntry.getValue() * actionProbability;
                     ++nrEntries;
                 }
             }

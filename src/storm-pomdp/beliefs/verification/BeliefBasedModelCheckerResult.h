@@ -1,5 +1,6 @@
 #pragma once
 
+#include "storm-pomdp/beliefs/policy/ObservationBasedFiniteStateController.h"
 #include "storm/utility/ExtendedNumber.h"
 
 #include <cstdint>
@@ -24,13 +25,12 @@ struct BeliefBasedModelCheckerStatistics {
 };
 
 /** Result of a belief-based model-checking run. */
-template<typename BeliefMdpValueType>
+template<typename BeliefMdpValueType, typename PolicyValueType = BeliefMdpValueType>
 struct BeliefBasedModelCheckerResult {
-    using ValueType = storm::utility::ExtendedValueType<BeliefMdpValueType>;
-
-    ValueType value;
+    storm::utility::ExtendedValueType<BeliefMdpValueType> value;
     bool completedExploration;
     BeliefBasedModelCheckerStatistics statistics;
+    std::optional<storm::pomdp::policy::ObservationBasedFiniteStateController<PolicyValueType>> policy;
 };
 
 }  // namespace storm::pomdp::beliefs
