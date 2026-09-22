@@ -124,15 +124,18 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType>::exportPoli
         }
     }
 
-    for (uint64_t i = 0; i < pomdpApproximationSchedulers->size(); ++i) {
-        // TODO extend for fm-policies
-        if (cutoffPolicyToFscNodeMap.contains(i)) {
-            for (auto observationToActionMap = pomdpSchedulerToObservationBasedMap(pomdpApproximationSchedulers->at(i));
-                 auto const& [observationId, actionDist] : observationToActionMap) {
-                if (actionDist.size() == 1) {
-                    fsc.addDeterministicActionTransition(cutoffPolicyToFscNodeMap[i], observationId, actionDist.begin()->first, cutoffPolicyToFscNodeMap[i]);
-                } else {
-                    fsc.addRandomisedActionTransition(cutoffPolicyToFscNodeMap[i], observationId, actionDist, cutoffPolicyToFscNodeMap[i]);
+    if (pomdpApproximationSchedulers.has_value()) {
+        for (uint64_t i = 0; i < pomdpApproximationSchedulers->size(); ++i) {
+            // TODO extend for fm-policies
+            if (cutoffPolicyToFscNodeMap.contains(i)) {
+                for (auto observationToActionMap = pomdpSchedulerToObservationBasedMap(pomdpApproximationSchedulers->at(i));
+                     auto const& [observationId, actionDist] : observationToActionMap) {
+                    if (actionDist.size() == 1) {
+                        fsc.addDeterministicActionTransition(cutoffPolicyToFscNodeMap[i], observationId, actionDist.begin()->first,
+                                                             cutoffPolicyToFscNodeMap[i]);
+                    } else {
+                        fsc.addRandomisedActionTransition(cutoffPolicyToFscNodeMap[i], observationId, actionDist, cutoffPolicyToFscNodeMap[i]);
+                    }
                 }
             }
         }

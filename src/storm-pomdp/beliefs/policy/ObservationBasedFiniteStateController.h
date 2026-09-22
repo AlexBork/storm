@@ -81,6 +81,7 @@ class ObservationBasedFiniteStateController {
 
     std::string toString() const;
     void writeDotToStream(std::ostream& outStream) const;
+    void writeJsonToStream(std::ostream& outStream) const;
 
    private:
     void addActionOutputUpdate(uint64_t originId, uint64_t observationId, std::unique_ptr<FSCOutputUpdate> update);

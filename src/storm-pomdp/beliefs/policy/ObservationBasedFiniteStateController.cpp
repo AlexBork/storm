@@ -1,7 +1,9 @@
 #include "ObservationBasedFiniteStateController.h"
 
+#include <algorithm>
 #include <utility>
 
+#include "storm/adapters/JsonAdapter.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/storage/Distribution.h"
 #include "storm/utility/constants.h"
@@ -275,6 +277,75 @@ void ObservationBasedFiniteStateController<ValueType>::writeDotToStream(std::ost
         }
     }
     outStream << "}\n";
+}
+
+template<typename ValueType>
+void ObservationBasedFiniteStateController<ValueType>::writeJsonToStream(std::ostream& outStream) const {
+    storm::json<ValueType> output;
+    output["initial-node"] = initialNodeId;
+    output["deterministic"] = isDeterministicPolicy;
+    output["nodes"] = storm::json<ValueType>::array();
+
+    std::vector<uint64_t> nodeIds;
+    nodeIds.push_back(initialNodeId);
+    for (auto const& [originId, actionOutputMap] : transitions) {
+        nodeIds.push_back(originId);
+        for (auto const& [observationId, outputUpdatePtr] : actionOutputMap) {
+            nodeIds.push_back(outputUpdatePtr->nextMemoryNode);
+        }
+    }
+    std::ranges::sort(nodeIds);
+    nodeIds.erase(std::unique(nodeIds.begin(), nodeIds.end()), nodeIds.end());
+
+    for (uint64_t nodeId : nodeIds) {
+        storm::json<ValueType> node;
+        node["id"] = nodeId;
+        node["transitions"] = storm::json<ValueType>::array();
+        if (transitions.contains(nodeId)) {
+            std::vector<uint64_t> observationIds;
+            observationIds.reserve(transitions.at(nodeId).size());
+            for (auto const& [observationId, outputUpdatePtr] : transitions.at(nodeId)) {
+                observationIds.push_back(observationId);
+            }
+            std::ranges::sort(observationIds);
+
+            for (uint64_t observationId : observationIds) {
+                auto const& update = *transitions.at(nodeId).at(observationId);
+                storm::json<ValueType> transition;
+                transition["observation"]["id"] = observationId;
+                if (idToObservationName && idToObservationName->contains(observationId)) {
+                    transition["observation"]["name"] = idToObservationName->at(observationId);
+                }
+                transition["successor"] = update.nextMemoryNode;
+                transition["actions"] = storm::json<ValueType>::array();
+
+                std::vector<std::pair<uint64_t, ValueType>> actions;
+                if (update.randomisedActionOutput()) {
+                    auto const& randomizedUpdate = dynamic_cast<RandomisedActionUpdate<ValueType> const&>(update);
+                    for (auto const& [actionId, probability] : randomizedUpdate.actionDistribution) {
+                        actions.emplace_back(actionId, probability);
+                    }
+                } else {
+                    auto const& deterministicUpdate = dynamic_cast<DeterministicActionUpdate const&>(update);
+                    actions.emplace_back(deterministicUpdate.action, storm::utility::one<ValueType>());
+                }
+                std::ranges::sort(actions, {}, &std::pair<uint64_t, ValueType>::first);
+
+                for (auto const& [actionId, probability] : actions) {
+                    storm::json<ValueType> action;
+                    action["id"] = actionId;
+                    if (idToActionName && idToActionName->contains(observationId) && idToActionName->at(observationId).contains(actionId)) {
+                        action["name"] = idToActionName->at(observationId).at(actionId);
+                    }
+                    action["probability"] = probability;
+                    transition["actions"].push_back(std::move(action));
+                }
+                node["transitions"].push_back(std::move(transition));
+            }
+        }
+        output["nodes"].push_back(std::move(node));
+    }
+    outStream << storm::dumpJson(output) << '\n';
 }
 
 template class ObservationBasedFiniteStateController<double>;

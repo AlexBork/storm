@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BeliefBasedModelCheckerOptions.h"
+#include "storm-pomdp/beliefs/policy/ObservationBasedFiniteStateController.h"
 #include "storm-pomdp/beliefs/verification/PropertyInformation.h"
 #include "storm-pomdp/storage/BeliefExplorationBounds.h"
 
@@ -22,10 +23,10 @@ template<typename PomdpModelType, typename BeliefValueType = typename PomdpModel
 class BeliefBasedModelChecker {
    public:
     using PomdpValueType = PomdpModelType::ValueType;
+    using PolicyType = storm::pomdp::policy::ObservationBasedFiniteStateController<PomdpValueType>;
 
-    /** Statistics recorded for the most recently completed checking run. */
+    /** Statistics recorded during a checking run. */
     struct RunStatistics {
-        bool available = false;
         bool completedExploration = false;
         uint64_t discoveredBeliefs = 0;
         uint64_t exploredBeliefs = 0;
@@ -40,58 +41,60 @@ class BeliefBasedModelChecker {
         uint64_t beliefMdpAnalysisTimeMilliseconds = 0;
     };
 
+    /** Result of a belief-based model-checking run. */
+    struct CheckResult {
+        BeliefMdpValueType value;
+        bool completedExploration;
+        RunStatistics statistics;
+        std::optional<PolicyType> policy;
+    };
+
     /** Creates a checker for a canonic POMDP. The POMDP must outlive the checker. */
     explicit BeliefBasedModelChecker(PomdpModelType const& pomdp);
 
     /**
      * Explores the belief MDP by unfolding the belief space. Exploration may stop early and use cut-offs or clipping.
      *
-     * @return the value of the constructed MDP at the initial belief and whether exploration completed.
+     * @return the value, completion status, statistics, and optional policy produced by the checking run.
      */
-    std::pair<BeliefMdpValueType, bool> checkUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                    BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                    storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
+    CheckResult checkUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                            BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+                            storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
 
     /**
      * Explores the belief space and discretises beliefs using the Freudenthal triangualtion approximation.
      *
      * @param resolution Grid resolution used for the discretisation.
      * @param useDynamic Selects a per-belief resolution when a coarser grid represents the belief more accurately.
-     * @return the value of the constructed MDP at the initial belief and whether exploration completed.
+     * @return the value, completion status, statistics, and optional policy produced by the checking run.
      */
-    std::pair<BeliefMdpValueType, bool> checkDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                        storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                        uint64_t resolution, bool useDynamic,
-                                                        storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
+    CheckResult checkDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
+                                storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
 
     /**
      * Explores a reward-aware belief MDP, splitting beliefs before successor generation by their reward vectors.
      *
      * @param relevantRewardModelNames Reward models whose accumulated rewards become part of the belief observation.
-     * @return the value of the constructed MDP at the initial belief and whether exploration completed.
+     * @return the value, completion status, statistics, and optional policy produced by the checking run.
      */
-    std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                               storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                               storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
-                                                               std::vector<std::string> const& relevantRewardModelNames = {});
+    CheckResult checkRewardAwareUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                       storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+                                       storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
+                                       std::vector<std::string> const& relevantRewardModelNames = {});
 
     /**
      * Combines reward-aware exploration with Freudenthal triangulation discretization.
      *
-     * @return the value of the constructed MDP at the initial belief and whether exploration completed.
+     * @return the value, completion status, statistics, and optional policy produced by the checking run.
      */
-    std::pair<BeliefMdpValueType, bool> checkRewardAwareDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                                   storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                                   uint64_t resolution, bool useDynamic,
-                                                                   storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
-                                                                   std::vector<std::string> const& relevantRewardModelNames = {});
-
-    /** @return statistics for the last checking invocation. */
-    RunStatistics const& getLastRunStatistics() const;
+    CheckResult checkRewardAwareDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                           storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution,
+                                           bool useDynamic, storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
+                                           std::vector<std::string> const& relevantRewardModelNames = {});
 
    private:
     PomdpModelType const& inputPomdp;
-    RunStatistics lastRunStatistics;
 };
 }  // namespace pomdp::beliefs
 }  // namespace storm

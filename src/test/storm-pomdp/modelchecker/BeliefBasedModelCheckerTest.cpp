@@ -4,6 +4,7 @@
 #include "storm-parsers/api/storm-parsers.h"
 #include "storm-pomdp/analysis/FormulaInformation.h"
 #include "storm-pomdp/analysis/QualitativeAnalysisOnGraphs.h"
+#include "storm-pomdp/beliefs/policy/ApplyObservationBasedFSCToPomdp.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
 #include "storm-pomdp/modelchecker/PreprocessingPomdpValueBoundsModelChecker.h"
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
@@ -354,6 +355,33 @@ typedef ::testing::Types<DefaultDoubleVIEnvironment, SelfloopReductionDefaultDou
 
 TYPED_TEST_SUITE(BeliefBasedModelCheckerTest, TestingTypes, );
 
+using PolicyGeneratingBeliefBasedModelCheckerTest = BeliefBasedModelCheckerTest<DefaultDoubleVIEnvironment>;
+
+TEST_F(PolicyGeneratingBeliefBasedModelCheckerTest, GeneratesPolicyForUnfolding) {
+    using POMDPType = storm::models::sparse::Pomdp<double>;
+    auto data = buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0");
+    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, double, double> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<POMDPType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::BeliefExplorationBounds<double> precomputedBeliefBounds;
+    precomputedBeliefBounds.preprocessingBounds = preprocessChecker.getValueBounds(env(), *data.formula);
+
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<double> options;
+    options.buildChoiceLabeling = false;
+    options.generatePolicy = true;
+    options.maxExplorationSize = 2;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+
+    auto checkResult = checker.checkUnfold(env(), *data.propertyInfo, options, precomputedBeliefBounds);
+
+    ASSERT_TRUE(checkResult.policy.has_value());
+    EXPECT_EQ(checkResult.completedExploration, checkResult.statistics.completedExploration);
+    EXPECT_GT(checkResult.statistics.discoveredBeliefs, 0ul);
+    auto const& policy = *checkResult.policy;
+    uint64_t const initialObservation = data.model->getObservation(data.model->getInitialStates().getNextSetIndex(0));
+    EXPECT_TRUE(policy.hasOutputForObservationInNode(policy.getInitialNodeId(), initialObservation));
+}
+
 TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmax) {
     typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
     typedef typename TestFixture::POMDPValueType POMDPValueType;
@@ -376,11 +404,14 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmax) {
     bool completedOverExploration;
     bool completedUnderExploration;
     auto expected = this->template parseNumber<BeliefMDPValueType>("7/10");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_GE(overResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << underResultValue << ", " << overResultValue
@@ -410,11 +441,14 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_Pmin) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("3/10");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
@@ -443,12 +477,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Pmax) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("7/10");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_GE(overResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
 
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << underResultValue << ", " << overResultValue
@@ -476,11 +513,14 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Pmin) {
     bool completedUnderExploration;
 
     POMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("3/10");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     if (this->isExact()) {
         // This model's value can only be approximated arbitrarily close but never reached
         // Exact arithmetics will thus not reach the value with absoulute precision either.
@@ -518,12 +558,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_Rmax) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("29/50");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_GE(overResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << underResultValue << ", " << overResultValue
@@ -552,12 +595,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_Rmin) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("19/50");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
@@ -585,12 +631,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Rmax) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("29/30");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_GE(overResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << underResultValue << ", " << overResultValue
@@ -619,12 +668,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, simple_slippery_Rmin) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("19/30");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
@@ -653,12 +705,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, maze2_Rmin) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("74/91");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
@@ -686,12 +741,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, maze2_Rmax) {
     bool completedOverExploration;
     bool completedUnderExploration;
 
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_TRUE(storm::utility::isInfinity(overResultValue));
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_TRUE(storm::utility::isInfinity(underResultValue));
 }
 
@@ -717,12 +775,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, maze2_slippery_Rmin) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("80/91");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
@@ -750,12 +811,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, maze2_slippery_Rmax) {
     bool completedOverExploration;
     bool completedUnderExploration;
 
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_TRUE(storm::utility::isInfinity(overResultValue));
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_TRUE(storm::utility::isInfinity(underResultValue));
 }
 
@@ -781,12 +845,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmax) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("38/155");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_GE(overResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << underResultValue << ", " << overResultValue
@@ -815,12 +882,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmin) {
     bool completedUnderExploration;
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("0");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
@@ -828,6 +898,35 @@ TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmin) {
 }
 
 #if defined STORM_HAVE_LP_SOLVER
+TEST_F(PolicyGeneratingBeliefBasedModelCheckerTest, GeneratesApplicablePolicyWithClipping) {
+    using POMDPType = storm::models::sparse::Pomdp<double>;
+    auto data = buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple.prism", "Pmax=? [F \"goal\" ]", "slippery=0.4");
+    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, double, double> checker(*data.model);
+    storm::pomdp::modelchecker::PreprocessingPomdpValueBoundsModelChecker<POMDPType> preprocessChecker(*data.model);
+
+    storm::pomdp::storage::BeliefExplorationBounds<double> precomputedBeliefBounds;
+    precomputedBeliefBounds.preprocessingBounds = preprocessChecker.getValueBounds(env(), *data.formula);
+
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<double> options;
+    options.generatePolicy = true;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    options.useClipping = true;
+    options.clippingResolutions = std::vector<uint64_t>(data.model->getNrObservations(), 2);
+
+    auto checkResult = checker.checkUnfold(env(), *data.propertyInfo, options, precomputedBeliefBounds);
+
+    ASSERT_TRUE(checkResult.policy.has_value());
+    auto const& policy = *checkResult.policy;
+    uint64_t const initialObservation = data.model->getObservation(data.model->getInitialStates().getNextSetIndex(0));
+    EXPECT_TRUE(policy.hasOutputForObservationInNode(policy.getInitialNodeId(), initialObservation));
+
+    auto inducedDtmc = storm::pomdp::policy::applyObservationBasedFSCToPomdp(*data.model, policy, true);
+    EXPECT_GT(inducedDtmc.getNumberOfStates(), 0ul);
+    EXPECT_GT(inducedDtmc.getNumberOfTransitions(), 0ul);
+    EXPECT_TRUE(inducedDtmc.getTransitionMatrix().isProbabilistic(1e-12));
+}
+
 TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmax) {
     typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
     typedef typename TestFixture::POMDPValueType POMDPValueType;
@@ -853,12 +952,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmax) {
     bool completedUnderExploration;
     auto expected = this->template parseNumber<BeliefMDPValueType>("7/10");
 
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_LE(overResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << underResultValue << ", " << overResultValue
@@ -891,12 +993,15 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmin) {
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("3/10");
 
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
     EXPECT_GE(overResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
     EXPECT_LE(storm::utility::abs<BeliefMDPValueType>(BeliefMDPValueType(overResultValue - underResultValue)), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
@@ -924,7 +1029,7 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmin_early_clipping_is_sound
 
     auto underResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
     auto expected = this->template parseNumber<BeliefMDPValueType>("3/10");
-    EXPECT_GE(underResult.first, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
+    EXPECT_GE(underResult.value, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_slippery_Pmax) {
@@ -953,7 +1058,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_slippery_Pmax) {
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
 
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -981,11 +1088,14 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_slippery_Pmin) {
     bool completedUnderExploration;
 
     POMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("3/10");
-    std::tie(overResultValue, completedOverExploration) =
-        checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    auto overCheckResult = checker.checkDiscretize(this->env(), *data.propertyInfo, options, this->overApproxResolution(), true, precomputedBeliefBounds);
+    overResultValue = overCheckResult.value;
+    completedOverExploration = overCheckResult.completedExploration;
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     if (this->isExact()) {
         // This model's value can only be approximated arbitrarily close but never reached
         // Exact arithmetics will thus not reach the value with absoulute precision either.
@@ -1027,7 +1137,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Rmax) {
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("29/50");
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -1057,7 +1169,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Rmin) {
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("19/50");
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -1087,7 +1201,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_slippery_Rmax) {
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("29/30");
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -1117,7 +1233,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_slippery_Rmin) {
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("19/30");
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -1146,7 +1264,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_maze2_Rmin) {
 
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("74/91");
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -1174,7 +1294,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_maze2_Rmax) {
     bool completedUnderExploration;
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_TRUE(storm::utility::isInfinity(underResultValue));
 }
 
@@ -1204,7 +1326,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_maze2_slippery_Rmin) {
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("80/91");
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -1232,7 +1356,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_maze2_slippery_Rmax) {
     bool completedUnderExploration;
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_TRUE(storm::utility::isInfinity(underResultValue));
 }
 
@@ -1261,7 +1387,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_refuel_Pmax) {
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("38/155");
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_LE(underResultValue, expected + this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
@@ -1290,7 +1418,9 @@ TYPED_TEST(BeliefBasedModelCheckerTest, clip_refuel_Pmin) {
     BeliefMDPValueType expected = this->template parseNumber<BeliefMDPValueType>("0");
 
     options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
-    std::tie(underResultValue, completedUnderExploration) = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    auto underCheckResult = checker.checkUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds);
+    underResultValue = underCheckResult.value;
+    completedUnderExploration = underCheckResult.completedExploration;
     EXPECT_GE(underResultValue, expected - this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 

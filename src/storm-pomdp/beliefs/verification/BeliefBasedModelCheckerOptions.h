@@ -13,6 +13,7 @@ enum explorationTerminationCriterion { MAX_EXPLORATION_SIZE, MAX_EXPLORATION_TIM
 template<typename ValueType>
 struct BeliefBasedModelCheckerOptions {
     bool buildChoiceLabeling = true;
+    bool generatePolicy = false;
     bool useClipping = false;
 
     ExplorationQueueOrder explorationQueueOrder = ExplorationQueueOrder::Unordered;
