@@ -1,17 +1,18 @@
+#pragma once
+
 #include "storm-pomdp/beliefs/policy/ObservationBasedFiniteStateController.h"
 #include "storm/api/export.h"
 #include "storm/models/sparse/Dtmc.h"
+#include "storm/models/sparse/Pomdp.h"
 
 namespace storm {
 namespace pomdp::policy {
-namespace {
 template<typename PomdpValueType>
 std::string getObservationName(storm::models::sparse::Pomdp<PomdpValueType> const& pomdp, uint64_t const observationId) {
     std::string observationName = pomdp.getObservationValuations().toString(observationId, true);
     std::ranges::replace(observationName, '\t', ' ');
     return observationName;
 }
-}  // namespace
 
 /**
  * Applies an observation-based finite-state controller to a POMDP and constructs the induced DTMC.
@@ -124,6 +125,16 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
             actionDistribution = storm::storage::Distribution<FscValueType, uint64_t>();
             actionDistribution.addProbability(0ul, storm::utility::one<FscValueType>());
         }
+        for (auto const& [rewardModelName, rewardModel] : pomdp.getRewardModels()) {
+            auto& rewards = stateRewards[rewardModelName];
+            rewards.resize(currentStateId + 1, storm::utility::zero<PomdpValueType>());
+            if (rewardModel.hasStateRewards()) {
+                rewards[currentStateId] += rewardModel.getStateRewardVector()[currentPomdpState];
+            }
+            if (rewardModel.hasTransitionRewards()) {
+                STORM_LOG_WARN("Transition rewards are not supported when applying an FSC to a POMDP. They will be ignored.");
+            }
+        }
         for (auto const& actionEntry : actionDistribution) {
             auto const actionProbability = storm::utility::convertNumber<PomdpValueType>(actionEntry.second);
             uint64_t pomdpActionId = actionEntry.first;
@@ -135,17 +146,10 @@ storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
                 pomdpActionId = fscActionIdToPomdpActionIdMap->at(fscObservationId).at(actionEntry.first);
             }
             for (auto const& [rewardModelName, rewardModel] : pomdp.getRewardModels()) {
-                stateRewards[rewardModelName].push_back(storm::utility::zero<PomdpValueType>());
-                if (rewardModel.hasStateRewards()) {
-                    stateRewards[rewardModelName][currentStateId] += rewardModel.getStateRewardVector()[currentPomdpState];
-                }
                 // We take the expected reward over the action distribution, so not all properties are preserved.
                 if (rewardModel.hasStateActionRewards()) {
                     uint64_t globalActionIndex = pomdp.getTransitionMatrix().getRowGroupIndices()[currentPomdpState] + pomdpActionId;
                     stateRewards[rewardModelName][currentStateId] += rewardModel.getStateActionRewardVector()[globalActionIndex] * actionProbability;
-                }
-                if (rewardModel.hasTransitionRewards()) {
-                    STORM_LOG_WARN("Transition rewards are not supported when applying an FSC to a POMDP. They will be ignored.");
                 }
             }
             for (auto const& transitionEntry : pomdp.getTransitionMatrix().getRow(currentPomdpState, pomdpActionId)) {

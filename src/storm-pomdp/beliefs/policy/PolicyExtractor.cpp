@@ -1,12 +1,15 @@
 #include "PolicyExtractor.h"
 
 #include "storm/adapters/RationalFunctionAdapter.h"
+#include "storm/exceptions/UnexpectedException.h"
 #include "storm/models/sparse/Mdp.h"
 #include "storm/models/sparse/Model.h"
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/storage/Scheduler.h"
 #include "storm/storage/sparse/ModelComponents.h"
 
+#include <charconv>
+#include <string_view>
 #include <unordered_set>
 
 namespace storm::pomdp::policy {
@@ -94,7 +97,23 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValue
             auto successorBeliefStateId = entry.getColumn();
             if (beliefMdp.getStateLabeling().getStateHasLabel("truncated", successorBeliefStateId)) {
                 // State has been cut off. Add transition to self-looping cut-off policy node.
-                auto chosenCutoffPolicy = beliefMdpScheduler.getChoice(successorBeliefStateId).getDeterministicChoice();
+                auto const localCutoffChoice = beliefMdpScheduler.getChoice(successorBeliefStateId).getDeterministicChoice();
+                auto const globalCutoffChoice = beliefMdp.getTransitionMatrix().getRowGroupIndices()[successorBeliefStateId] + localCutoffChoice;
+                auto const& cutoffChoiceLabels = beliefMdp.getChoiceLabeling().getLabelsOfChoice(globalCutoffChoice);
+                STORM_LOG_THROW(cutoffChoiceLabels.size() == 1, storm::exceptions::UnexpectedException,
+                                "Expected the selected cutoff choice to have exactly one scheduler label.");
+                std::string const& cutoffChoiceLabel = *cutoffChoiceLabels.begin();
+                constexpr std::string_view schedulerLabelPrefix = "__sched_";
+                STORM_LOG_THROW(cutoffChoiceLabel.starts_with(schedulerLabelPrefix), storm::exceptions::UnexpectedException,
+                                "Expected cutoff scheduler label, but found '" << cutoffChoiceLabel << "'.");
+                uint64_t chosenCutoffPolicy = 0;
+                auto const schedulerIndex = std::string_view(cutoffChoiceLabel).substr(schedulerLabelPrefix.size());
+                auto const [parseEnd, parseError] = std::from_chars(schedulerIndex.begin(), schedulerIndex.end(), chosenCutoffPolicy);
+                STORM_LOG_THROW(parseError == std::errc() && parseEnd == schedulerIndex.end(), storm::exceptions::UnexpectedException,
+                                "Could not parse cutoff scheduler label '" << cutoffChoiceLabel << "'.");
+                STORM_LOG_THROW(pomdpApproximationSchedulers.has_value() && chosenCutoffPolicy < pomdpApproximationSchedulers->size(),
+                                storm::exceptions::UnexpectedException,
+                                "Cutoff scheduler label '" << cutoffChoiceLabel << "' does not refer to an available approximation scheduler.");
                 if (!cutoffPolicyToFscNodeMap.contains(chosenCutoffPolicy)) {
                     // TODO extend for fm-policies
                     cutoffPolicyToFscNodeMap[chosenCutoffPolicy] = nextId;
@@ -192,7 +211,7 @@ PolicyExtractor<PomdpModelType, BeliefValueType, BeliefMdpValueType, PolicyValue
         // Add empty string as label of all choices without labels
         storm::models::sparse::ChoiceLabeling extendedChoiceLabeling(beliefMdp.getChoiceLabeling());
         extendedChoiceLabeling.addLabel("");
-        for (uint64_t i = 0; i < beliefMdp.getNumberOfStates(); ++i) {
+        for (uint64_t i = 0; i < beliefMdp.getNumberOfChoices(); ++i) {
             if (beliefMdp.getChoiceLabeling().getLabelsOfChoice(i).empty()) {
                 extendedChoiceLabeling.addLabelToChoice("", i);
             }

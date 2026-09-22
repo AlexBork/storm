@@ -288,6 +288,7 @@ class ObservationBasedFiniteStateController {
     std::unordered_map<uint64_t, ActionOutputUpdate> transitions;
     std::optional<std::unordered_map<uint64_t, std::string>> idToObservationName = std::nullopt;
     std::optional<std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::string>>> idToActionName = std::nullopt;
+    uint64_t numberOfRandomisedOutputs = 0;
     bool isDeterministicPolicy = true;
 };
 

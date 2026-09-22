@@ -37,7 +37,6 @@ template<typename ValueType>
 void ObservationBasedFiniteStateController<ValueType>::addRandomisedActionTransition(uint64_t const originId, uint64_t const observationId,
                                                                                      storm::storage::Distribution<ValueType, uint64_t> actionDistribution,
                                                                                      uint64_t targetId) {
-    isDeterministicPolicy = false;
     auto update = std::make_unique<RandomisedActionUpdate<ValueType>>();
     update->actionDistribution = std::move(actionDistribution);
     update->nextMemoryNode = targetId;
@@ -141,7 +140,16 @@ std::optional<uint64_t> ObservationBasedFiniteStateController<ValueType>::getAct
 template<typename ValueType>
 void ObservationBasedFiniteStateController<ValueType>::addActionOutputUpdate(uint64_t const originId, uint64_t const observationId,
                                                                              std::unique_ptr<FSCOutputUpdate> update) {
-    transitions[originId][observationId] = std::move(update);
+    auto& outputsForNode = transitions[originId];
+    if (auto const existingUpdate = outputsForNode.find(observationId);
+        existingUpdate != outputsForNode.end() && existingUpdate->second->randomisedActionOutput()) {
+        --numberOfRandomisedOutputs;
+    }
+    if (update->randomisedActionOutput()) {
+        ++numberOfRandomisedOutputs;
+    }
+    outputsForNode[observationId] = std::move(update);
+    isDeterministicPolicy = numberOfRandomisedOutputs == 0;
 }
 
 template<typename ValueType>
