@@ -40,6 +40,7 @@
 #include "storm/modelchecker/results/ExplicitQualitativeCheckResult.h"
 #include "storm/transformer/MakePOMDPCanonic.h"
 #include "storm/transformer/SparseRationalModelToDoubleTransformer.h"
+#include "storm/utility/ExtendedNumber.h"
 #include "storm/utility/NumberTraits.h"
 #include "storm/utility/SignalHandler.h"
 #include "storm/utility/Stopwatch.h"
@@ -94,7 +95,7 @@ void printResult(std::optional<ValueType> const& lowerBound, std::optional<Value
             } else {
                 STORM_PRINT_AND_LOG(*lowerBound);
             }
-        } else if (storm::utility::isInfinity<ValueType>(-*lowerBound)) {
+        } else if (storm::utility::isInfinity(ValueType(-*lowerBound))) {
             if (storm::utility::isInfinity(*upperBound)) {
                 STORM_PRINT_AND_LOG("[-inf, inf] (width=inf)");
             }
@@ -111,12 +112,10 @@ void printResult(std::optional<ValueType> const& lowerBound, std::optional<Value
         std::optional<double> roundedLowerBound = std::nullopt;
         std::optional<double> roundedUpperBound = std::nullopt;
         if (lowerBound.has_value()) {
-            roundedLowerBound =
-                storm::utility::isInfinity<ValueType>(-*lowerBound) ? -storm::utility::infinity<double>() : storm::utility::convertNumber<double>(*lowerBound);
+            roundedLowerBound = storm::utility::convertNumber<double>(*lowerBound);
         }
         if (upperBound.has_value()) {
-            roundedUpperBound =
-                storm::utility::isInfinity<ValueType>(*upperBound) ? storm::utility::infinity<double>() : storm::utility::convertNumber<double>(*upperBound);
+            roundedUpperBound = storm::utility::convertNumber<double>(*upperBound);
         }
         printResult(roundedLowerBound, roundedUpperBound);
         STORM_PRINT_AND_LOG(")");
@@ -410,9 +409,10 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     }
 
     uint64_t initialPomdpState = preprocessedPomdpPtr->getInitialStates().getNextSetIndex(0);
-    storage::BeliefExplorationResult<BeliefMDPType> result(
-        beliefExplorationBounds.preprocessingBounds->template getHighestLowerBound<BeliefMDPType>(initialPomdpState),
-        beliefExplorationBounds.preprocessingBounds->template getSmallestUpperBound<BeliefMDPType>(initialPomdpState));
+    using ExtendedBeliefMDPType = storm::utility::ExtendedValueType<BeliefMDPType>;
+    storage::BeliefExplorationResult<ExtendedBeliefMDPType> result(
+        storm::utility::fromSentinel(beliefExplorationBounds.preprocessingBounds->template getHighestLowerBound<BeliefMDPType>(initialPomdpState)),
+        storm::utility::fromSentinel(beliefExplorationBounds.preprocessingBounds->template getSmallestUpperBound<BeliefMDPType>(initialPomdpState)));
     STORM_LOG_INFO("Initial value bounds are [" << *result.lowerBound << ", " << *result.upperBound << "]");
 
     storm::pomdp::beliefs::PropertyInformation propertyInfo;
@@ -438,10 +438,9 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     STORM_LOG_THROW(!policyExportRequested || propertyInfo.kind != beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability,
                     storm::exceptions::InvalidSettingsException, "Policy export is not supported for reward-aware belief exploration.");
 
-    using CheckerType = storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>, BeliefType, BeliefMDPType>;
-    CheckerType checker(*preprocessedPomdpPtr);
-    BeliefMDPType overResultValue;
-    BeliefMDPType underResultValue;
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<ValueType>, BeliefType, BeliefMDPType> checker(*preprocessedPomdpPtr);
+    ExtendedBeliefMDPType overResultValue;
+    ExtendedBeliefMDPType underResultValue;
     bool isOverApproximation{false};
     bool isUnderApproximation{false};
     bool completedExploration{false};
@@ -485,7 +484,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             revisedOptions.clippingResolutions = std::vector<uint64_t>(preprocessedPomdpPtr->getNrObservations(), belExplSettings.getClippingGridResolution());
         }
         isUnderApproximation = true;
-        auto checkResult = [&]() -> typename CheckerType::CheckResult {
+        auto checkResult = [&]() -> typename storm::pomdp::beliefs::BeliefBasedModelCheckerResult<BeliefMDPType> {
             if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
                 std::vector<std::string> relevantRewardModelNames;
                 for (auto const& rewardBound : propertyInfo.rewardBounds) {
@@ -587,7 +586,7 @@ bool performAnalysis(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> co
             } else {
                 STORM_PRINT_AND_LOG("\nResult: ");
             }
-            printResult(std::optional<ValueType>(result.getMin()), std::optional<ValueType>(result.getMax()));
+            printResult(std::optional{result.getMin()}, std::optional{result.getMax()});
             STORM_PRINT_AND_LOG('\n');
         } else {
             STORM_PRINT_AND_LOG("\nResult: Not available.\n");
