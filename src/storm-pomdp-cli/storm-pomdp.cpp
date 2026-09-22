@@ -91,7 +91,7 @@ void printResult(std::optional<ValueType> const& lowerBound, std::optional<Value
             } else {
                 STORM_PRINT_AND_LOG(*lowerBound);
             }
-        } else if (storm::utility::isInfinity<ValueType>(-*lowerBound)) {
+        } else if (storm::utility::isInfinity(ValueType(-*lowerBound))) {
             if (storm::utility::isInfinity(*upperBound)) {
                 STORM_PRINT_AND_LOG("[-inf, inf] (width=inf)");
             }
@@ -109,11 +109,11 @@ void printResult(std::optional<ValueType> const& lowerBound, std::optional<Value
         std::optional<double> roundedUpperBound = std::nullopt;
         if (lowerBound.has_value()) {
             roundedLowerBound =
-                storm::utility::isInfinity<ValueType>(-*lowerBound) ? -storm::utility::infinity<double>() : storm::utility::convertNumber<double>(*lowerBound);
+                storm::utility::convertNumber<double>(lowerBound);
         }
         if (upperBound.has_value()) {
             roundedUpperBound =
-                storm::utility::isInfinity<ValueType>(*upperBound) ? storm::utility::infinity<double>() : storm::utility::convertNumber<double>(*upperBound);
+                storm::utility::convertNumber<double>(upperBound);
         }
         printResult(roundedLowerBound, roundedUpperBound);
         STORM_PRINT_AND_LOG(")");
@@ -543,7 +543,7 @@ bool performAnalysis(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> co
             } else {
                 STORM_PRINT_AND_LOG("\nResult: ");
             }
-            printResult(std::optional<ValueType>(result.getMin()), std::optional<ValueType>(result.getMax()));
+            printResult(result.getMin(), result.getMax());
             STORM_PRINT_AND_LOG('\n');
         } else {
             STORM_PRINT_AND_LOG("\nResult: Not available.\n");
