@@ -13,6 +13,23 @@ std::string getObservationName(storm::models::sparse::Pomdp<PomdpValueType> cons
 }
 }  // namespace
 
+/**
+ * Applies an observation-based finite-state controller to a POMDP and constructs the induced DTMC.
+ *
+ * States of the resulting DTMC represent reachable pairs of a POMDP state and an FSC memory node. If the FSC provides observation or action names, they
+ * are used to match its outputs to the POMDP; otherwise, the corresponding numeric IDs are assumed to agree. State and state-action rewards are preserved,
+ * while transition rewards are ignored.
+ *
+ * @tparam PomdpValueType The type used for probabilities and rewards in the POMDP and resulting DTMC.
+ * @tparam FscValueType The type used for probabilities in randomised FSC action outputs.
+ * @param pomdp The POMDP to which the controller is applied.
+ * @param fsc The finite-state controller to apply.
+ * @param treatUnspecifiedChoiceAsDontCare If true, an unspecified FSC output selects local action zero and keeps the current FSC memory node. If false,
+ * an unspecified output causes an exception.
+ * @return The DTMC induced by the POMDP and the FSC.
+ * @throws storm::exceptions::UnexpectedException If required observation or action names cannot be matched, or if the FSC has an unspecified output and
+ * @p treatUnspecifiedChoiceAsDontCare is false.
+ */
 template<typename PomdpValueType, typename FscValueType>
 storm::models::sparse::Dtmc<PomdpValueType> applyObservationBasedFSCToPomdp(
     storm::models::sparse::Pomdp<PomdpValueType> const& pomdp, storm::pomdp::policy::ObservationBasedFiniteStateController<FscValueType> const& fsc,
