@@ -121,9 +121,6 @@ void printResult(std::optional<ValueType> const& lowerBound, std::optional<Value
 
 template<typename Statistics>
 void printBeliefExplorationStatistics(Statistics const& statistics) {
-    if (!statistics.available) {
-        return;
-    }
     STORM_PRINT_AND_LOG("Belief exploration " << (statistics.completedExploration ? "completed" : "stopped early") << ": " << statistics.discoveredBeliefs
                                               << " beliefs discovered, " << statistics.exploredBeliefs << " beliefs explored.\n");
     STORM_PRINT_AND_LOG("Constructed belief MDP: " << statistics.beliefMdpStates << " states, " << statistics.beliefMdpChoices << " choices, "
@@ -429,13 +426,13 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             auto checkResult =
                 checker.checkRewardAwareDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
                                                    belExplSettings.isDynamicTriangulationModeSet(), beliefExplorationBounds, relevantRewardModelNames);
-            overResultValue = checkResult.first;
-            printBeliefExplorationStatistics(checker.getLastRunStatistics());
+            overResultValue = checkResult.value;
+            printBeliefExplorationStatistics(checkResult.statistics);
         } else {
             auto checkResult = checker.checkDiscretize(env, propertyInfo, revisedOptions, belExplSettings.getResolutionInit(),
                                                        belExplSettings.isDynamicTriangulationModeSet(), beliefExplorationBounds);
-            overResultValue = checkResult.first;
-            printBeliefExplorationStatistics(checker.getLastRunStatistics());
+            overResultValue = checkResult.value;
+            printBeliefExplorationStatistics(checkResult.statistics);
         }
     }
 
@@ -452,18 +449,19 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
             revisedOptions.clippingResolutions = std::vector<uint64_t>(preprocessedPomdpPtr->getNrObservations(), belExplSettings.getClippingGridResolution());
         }
         isUnderApproximation = true;
-        if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
-            std::vector<std::string> relevantRewardModelNames;
-            for (auto const& rewardBound : propertyInfo.rewardBounds) {
-                relevantRewardModelNames.push_back(rewardBound.rewardModelName);
+        auto checkResult = [&]() -> typename storm::pomdp::beliefs::BeliefBasedModelCheckerResult<BeliefMDPType> {
+            if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
+                std::vector<std::string> relevantRewardModelNames;
+                for (auto const& rewardBound : propertyInfo.rewardBounds) {
+                    relevantRewardModelNames.push_back(rewardBound.rewardModelName);
+                }
+                return checker.checkRewardAwareUnfold(env, propertyInfo, revisedOptions, beliefExplorationBounds, relevantRewardModelNames);
             }
-            std::tie(underResultValue, completedExploration) =
-                checker.checkRewardAwareUnfold(env, propertyInfo, revisedOptions, beliefExplorationBounds, relevantRewardModelNames);
-            printBeliefExplorationStatistics(checker.getLastRunStatistics());
-        } else {
-            std::tie(underResultValue, completedExploration) = checker.checkUnfold(env, propertyInfo, revisedOptions, beliefExplorationBounds);
-            printBeliefExplorationStatistics(checker.getLastRunStatistics());
-        }
+            return checker.checkUnfold(env, propertyInfo, revisedOptions, beliefExplorationBounds);
+        }();
+        underResultValue = checkResult.value;
+        completedExploration = checkResult.completedExploration;
+        printBeliefExplorationStatistics(checkResult.statistics);
         isOverApproximation = (completedExploration && !belExplSettings.isUseClippingSet()) || isOverApproximation;
     }
 
