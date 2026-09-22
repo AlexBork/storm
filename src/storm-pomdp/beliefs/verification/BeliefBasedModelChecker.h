@@ -3,6 +3,7 @@
 #include "BeliefBasedModelCheckerOptions.h"
 #include "storm-pomdp/beliefs/verification/PropertyInformation.h"
 #include "storm-pomdp/storage/BeliefExplorationBounds.h"
+#include "storm/utility/ExtendedNumber.h"
 
 #include <optional>
 
@@ -22,6 +23,7 @@ template<typename PomdpModelType, typename BeliefValueType = typename PomdpModel
 class BeliefBasedModelChecker {
    public:
     using PomdpValueType = PomdpModelType::ValueType;
+    using ExtendedBeliefMdpValueType = storm::utility::ExtendedValueType<BeliefMdpValueType>;
 
     /** Statistics recorded for the most recently completed checking run. */
     struct RunStatistics {
@@ -48,9 +50,9 @@ class BeliefBasedModelChecker {
      *
      * @return the value of the constructed MDP at the initial belief and whether exploration completed.
      */
-    std::pair<BeliefMdpValueType, bool> checkUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                    BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                    storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
+    std::pair<ExtendedBeliefMdpValueType, bool> checkUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                                            BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+                                                            storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
 
     /**
      * Explores the belief space and discretises beliefs using the Freudenthal triangualtion approximation.
@@ -59,10 +61,10 @@ class BeliefBasedModelChecker {
      * @param useDynamic Selects a per-belief resolution when a coarser grid represents the belief more accurately.
      * @return the value of the constructed MDP at the initial belief and whether exploration completed.
      */
-    std::pair<BeliefMdpValueType, bool> checkDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                        storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                        uint64_t resolution, bool useDynamic,
-                                                        storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
+    std::pair<ExtendedBeliefMdpValueType, bool> checkDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                                                storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+                                                                uint64_t resolution, bool useDynamic,
+                                                                storage::BeliefExplorationBounds<PomdpValueType> const& valueBounds);
 
     /**
      * Explores a reward-aware belief MDP, splitting beliefs before successor generation by their reward vectors.
@@ -70,21 +72,20 @@ class BeliefBasedModelChecker {
      * @param relevantRewardModelNames Reward models whose accumulated rewards become part of the belief observation.
      * @return the value of the constructed MDP at the initial belief and whether exploration completed.
      */
-    std::pair<BeliefMdpValueType, bool> checkRewardAwareUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                               storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                               storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
-                                                               std::vector<std::string> const& relevantRewardModelNames = {});
+    std::pair<ExtendedBeliefMdpValueType, bool> checkRewardAwareUnfold(storm::Environment const& env, PropertyInformation const& propertyInformation,
+                                                                       storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
+                                                                       storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
+                                                                       std::vector<std::string> const& relevantRewardModelNames = {});
 
     /**
      * Combines reward-aware exploration with Freudenthal triangulation discretization.
      *
      * @return the value of the constructed MDP at the initial belief and whether exploration completed.
      */
-    std::pair<BeliefMdpValueType, bool> checkRewardAwareDiscretize(storm::Environment const& env, PropertyInformation const& propertyInformation,
-                                                                   storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
-                                                                   uint64_t resolution, bool useDynamic,
-                                                                   storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds,
-                                                                   std::vector<std::string> const& relevantRewardModelNames = {});
+    std::pair<ExtendedBeliefMdpValueType, bool> checkRewardAwareDiscretize(
+        storm::Environment const& env, PropertyInformation const& propertyInformation,
+        storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
+        storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames = {});
 
     /** @return statistics for the last checking invocation. */
     RunStatistics const& getLastRunStatistics() const;
