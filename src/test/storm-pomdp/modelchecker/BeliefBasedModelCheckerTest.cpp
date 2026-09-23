@@ -247,8 +247,8 @@ class BeliefBasedModelCheckerTest : public ::testing::Test {
         Input input;
         input.formula = storm::api::parsePropertiesForPrismProgram(formulaAsString, program).front().getRawFormula();
         input.model = storm::api::buildSparseModel<POMDPValueType>(program, {input.formula})->template as<storm::models::sparse::Pomdp<POMDPValueType>>();
-        bool const isBoundedProbability = input.formula->isProbabilityOperatorFormula() &&
-                                          input.formula->asProbabilityOperatorFormula().getSubformula().isBoundedUntilFormula();
+        bool const isBoundedProbability =
+            input.formula->isProbabilityOperatorFormula() && input.formula->asProbabilityOperatorFormula().getSubformula().isBoundedUntilFormula();
 
         // Preprocess
         storm::transformer::MakePOMDPCanonic<POMDPValueType> makeCanonic(*input.model);
