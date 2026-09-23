@@ -394,8 +394,9 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
         for (uint64_t i = 0; i < boundedFormula.getDimension(); ++i) {
             const auto& tbRef = boundedFormula.getTimeBoundReference(i);
             if (tbRef.isRewardBound()) {
-                propertyInfo.rewardBounds.push_back(
-                    {tbRef.getRewardName(), boundedFormula.getLowerBoundAsOptionalTimeBound(i), boundedFormula.getUpperBoundAsOptionalTimeBound(i)});
+                propertyInfo.rewardBounds.push_back({.rewardModelName = tbRef.getOptionalRewardModelName().get_value_or(""),
+                                                     .lowerBound = boundedFormula.getLowerBoundAsOptionalTimeBound(i),
+                                                     .upperBound = boundedFormula.getUpperBoundAsOptionalTimeBound(i)});
             }
         }
     } else {
