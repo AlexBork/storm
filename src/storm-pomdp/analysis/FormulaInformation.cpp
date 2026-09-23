@@ -2,6 +2,7 @@
 
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/exceptions/InvalidPropertyException.h"
+#include "storm/exceptions/NotSupportedException.h"
 #include "storm/logic/Formulas.h"
 #include "storm/logic/FragmentSpecification.h"
 #include "storm/modelchecker/propositional/SparsePropositionalModelChecker.h"
@@ -158,7 +159,8 @@ FormulaInformation getFormulaInformation(PomdpType const& pomdp, storm::logic::P
         constraintsStatesFormula = boundedUntilFormula.getLeftSubformula().asSharedPointer();
         bounded = true;
         for (uint64_t i = 0; i < boundedUntilFormula.getDimension(); ++i) {
-            STORM_LOG_ASSERT(boundedUntilFormula.getTimeBoundReference(i).isRewardBound(), "Expected a reward bound reference.");
+            STORM_LOG_THROW(boundedUntilFormula.getTimeBoundReference(i).isRewardBound(), storm::exceptions::NotSupportedException,
+                            "For POMDPs, Storm currently does not support bounds other than reward bounds for bounded formulae.");
             rewardBoundReferences.push_back(boundedUntilFormula.getTimeBoundReference(i));
         }
     }
