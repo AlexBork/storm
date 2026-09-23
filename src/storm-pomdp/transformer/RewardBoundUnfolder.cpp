@@ -361,10 +361,8 @@ storm::storage::sparse::ModelComponents<ValueType> constructComponents(storm::mo
         }
     }
     // Create the reward models
-    // An unnamed reference to a unique named model must preserve that model under its actual name.
-    bool const preserveUniqueNamedModel = preservedRewardModels.contains("") && !originalModel.hasRewardModel("") && originalModel.hasUniqueRewardModel();
     for (auto const& [name, rewmodel] : originalModel.getRewardModels()) {
-        if (!preservedRewardModels.contains(name) && !(preserveUniqueNamedModel && name == originalModel.getUniqueRewardModelName())) {
+        if (!preservedRewardModels.contains(name)) {
             continue;
         }
         STORM_LOG_THROW(!rewmodel.hasTransitionRewards(), storm::exceptions::NotSupportedException,
