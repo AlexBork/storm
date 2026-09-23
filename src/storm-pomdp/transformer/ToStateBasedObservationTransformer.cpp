@@ -16,6 +16,9 @@ namespace storm::pomdp::transformer {
 template<typename ValueType>
 std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservationTransformer<ValueType>::transform(
     storm::models::sparse::Mdp<ValueType> const& mdp, TransitionObservationFunction const& transitionObservationFunction, ObservationType initialObservation) {
+    STORM_LOG_WARN_COND(!mdp.hasStateValuations(), "State valuations are not preserved in transformation to state-based observations.");
+    STORM_LOG_WARN_COND(!mdp.hasChoiceOrigins(), "Choice origins are not preserved in transformation to state-based observations.");
+
     auto const& transitionMatrix = mdp.getTransitionMatrix();
 
     // Create a vector that for each state contains the set of observations with which we may enter that state.
