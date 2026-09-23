@@ -55,27 +55,27 @@ std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model
     for (uint64_t formulaDim = 0; formulaDim < boundedUntilFormula.getDimension(); ++formulaDim) {
         int64_t const levelWidth = formulaDim < levelWidths.size() ? levelWidths[formulaDim] : 0;
         auto const& tbr = boundedUntilFormula.getTimeBoundReference(formulaDim);
-        STORM_LOG_THROW(tbr.hasRewardModelName(), storm::exceptions::NotSupportedException,
-                        "The reward model for bound reference " << formulaDim << " has no name.");
         STORM_LOG_THROW(
             !tbr.hasRewardAccumulation(), storm::exceptions::NotSupportedException,
             "The reward model for bound reference " << formulaDim << " has non-trivial reward accumulation which is not supported in this context.");
-        auto const& rewardModel = model.getRewardModel(tbr.getRewardModelName());
+        // An unnamed reference selects the explicit default model, or the unique model when no explicit default exists.
+        std::string const rewardModelName = tbr.getOptionalRewardModelName().get_value_or("");
+        auto const& rewardModel = model.getRewardModel(rewardModelName);
         // Note: computation of successor epoch is slightly more involved with transition rewards which is why we do not support them for now
         STORM_LOG_THROW(!rewardModel.hasTransitionRewards(), storm::exceptions::NotSupportedException,
                         "The reward model for bound reference " << formulaDim << " uses transition rewards. These are currently unsupported.");
         // All assigned rewards need to be integer (might support rational via scaling, but its unclear how to scale levelWidth)
         STORM_LOG_THROW(!rewardModel.hasStateRewards() || std::all_of(rewardModel.getStateRewardVector().begin(), rewardModel.getStateRewardVector().end(),
                                                                       storm::utility::isInteger<ValueType>),
-                        storm::exceptions::NotSupportedException, "State rewards in reward model " << tbr.getRewardModelName() << " are not integers.");
+                        storm::exceptions::NotSupportedException, "State rewards in reward model " << rewardModelName << " are not integers.");
         STORM_LOG_THROW(
             !rewardModel.hasStateActionRewards() || std::all_of(rewardModel.getStateActionRewardVector().begin(),
                                                                 rewardModel.getStateActionRewardVector().end(), storm::utility::isInteger<ValueType>),
-            storm::exceptions::NotSupportedException, "State action rewards in reward model " << tbr.getRewardModelName() << " are not integers.");
+            storm::exceptions::NotSupportedException, "State action rewards in reward model " << rewardModelName << " are not integers.");
         // The finite epoch abstraction assumes that accumulated rewards never decrease. In particular, a negative-reward cycle would
         // increase an epoch indefinitely and therefore make the unfolding infinite.
         STORM_LOG_THROW(!rewardModel.hasNegativeRewards(), storm::exceptions::NotSupportedException,
-                        "Reward model " << tbr.getRewardModelName() << " contains negative rewards. These are currently unsupported.");
+                        "Reward model " << rewardModelName << " contains negative rewards. These are currently unsupported.");
 
         // Helper function to generate fresh identifiers (either for level reward or active label)
         auto getFreshIdentifier = [&]() {
@@ -360,7 +360,6 @@ storm::storage::sparse::ModelComponents<ValueType> constructComponents(storm::mo
             components.choiceLabeling->addLabel(label, std::move(newLabel));
         }
     }
-
     // Create the reward models
     for (auto const& [name, rewmodel] : originalModel.getRewardModels()) {
         if (!preservedRewardModels.contains(name)) {
