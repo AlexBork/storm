@@ -37,12 +37,12 @@ bool BeliefNumerics<ValueType>::equal(ValueType const& lhs, ValueType const& rhs
 
 template<typename ValueType>
 bool BeliefNumerics<ValueType>::isZero(const ValueType& val) {
-    return storm::utility::isZero(detail::reprValue(val));
+    return BeliefNumerics::equal(val, storm::utility::zero<ValueType>());
 }
 
 template<typename ValueType>
 bool BeliefNumerics<ValueType>::isOne(const ValueType& val) {
-    return storm::utility::isOne(detail::reprValue(val));
+    return BeliefNumerics::equal(val, storm::utility::one<ValueType>());
 }
 
 template<typename ValueType>
