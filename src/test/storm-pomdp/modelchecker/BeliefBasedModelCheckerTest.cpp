@@ -247,12 +247,15 @@ class BeliefBasedModelCheckerTest : public ::testing::Test {
         Input input;
         input.formula = storm::api::parsePropertiesForPrismProgram(formulaAsString, program).front().getRawFormula();
         input.model = storm::api::buildSparseModel<POMDPValueType>(program, {input.formula})->template as<storm::models::sparse::Pomdp<POMDPValueType>>();
+        bool const isBoundedProbability = input.formula->isProbabilityOperatorFormula() &&
+                                          input.formula->asProbabilityOperatorFormula().getSubformula().isBoundedUntilFormula();
 
         // Preprocess
         storm::transformer::MakePOMDPCanonic<POMDPValueType> makeCanonic(*input.model);
         input.model = makeCanonic.transform();
         EXPECT_TRUE(input.model->isCanonic());
-        if (TestType::preprocessingType == PreprocessingType::SelfloopReduction || TestType::preprocessingType == PreprocessingType::All) {
+        if (!isBoundedProbability &&
+            (TestType::preprocessingType == PreprocessingType::SelfloopReduction || TestType::preprocessingType == PreprocessingType::All)) {
             storm::transformer::GlobalPOMDPSelfLoopEliminator<POMDPValueType> selfLoopEliminator(*input.model);
             if (selfLoopEliminator.preservesFormula(*input.formula)) {
                 input.model = selfLoopEliminator.transform();
@@ -265,7 +268,8 @@ class BeliefBasedModelCheckerTest : public ::testing::Test {
                 EXPECT_TRUE(!maximizing || input.formula->isRewardOperatorFormula());
             }
         }
-        if (TestType::preprocessingType == PreprocessingType::QualitativeReduction || TestType::preprocessingType == PreprocessingType::All) {
+        if (!isBoundedProbability &&
+            (TestType::preprocessingType == PreprocessingType::QualitativeReduction || TestType::preprocessingType == PreprocessingType::All)) {
             EXPECT_TRUE(input.formula->isOperatorFormula());
             EXPECT_TRUE(input.formula->asOperatorFormula().hasOptimalityType());
             if (input.formula->isProbabilityOperatorFormula() && storm::solver::maximize(input.formula->asOperatorFormula().getOptimalityType())) {
@@ -318,6 +322,15 @@ class BeliefBasedModelCheckerTest : public ::testing::Test {
         if (rewardModelName) {
             input.propertyInfo->kind = storm::pomdp::beliefs::PropertyInformation::Kind::ExpectedTotalReachabilityReward;
             input.propertyInfo->rewardModelName = rewardModelName;
+        } else if (formulaInfo.isBounded()) {
+            input.propertyInfo->kind = storm::pomdp::beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability;
+            auto const& boundedFormula = input.formula->asProbabilityOperatorFormula().getSubformula().asBoundedUntilFormula();
+            for (uint64_t i = 0; i < boundedFormula.getDimension(); ++i) {
+                auto const& reference = boundedFormula.getTimeBoundReference(i);
+                input.propertyInfo->rewardBounds.push_back({.rewardModelName = reference.getOptionalRewardModelName().get_value_or(""),
+                                                            .lowerBound = boundedFormula.getLowerBoundAsOptionalTimeBound(i),
+                                                            .upperBound = boundedFormula.getUpperBoundAsOptionalTimeBound(i)});
+            }
         } else {
             input.propertyInfo->kind = storm::pomdp::beliefs::PropertyInformation::Kind::ReachabilityProbability;
         }
@@ -818,6 +831,69 @@ TYPED_TEST(BeliefBasedModelCheckerTest, refuel_Pmin) {
     EXPECT_LE(storm::utility::abs(overResultValue - underResultValue), this->precision())
         << "Result [" << overResultValue << ", " << underResultValue
         << "] is not precise enough. If (only) this fails, the result bounds are still correct, but they might be unexpectedly imprecise.\n";
+}
+
+TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_min_max) {
+    typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
+    typedef typename TestFixture::POMDPValueType POMDPValueType;
+    typedef typename TestFixture::BeliefValueType BeliefValueType;
+    typedef typename TestFixture::BeliefMDPValueType BeliefMDPValueType;
+
+    auto check = [this](std::string const& formula, std::string const& expectedValue) {
+        auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism", formula, "slippery=0");
+        storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, BeliefValueType, BeliefMDPValueType> checker(*data.model);
+        storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> precomputedBeliefBounds;
+        precomputedBeliefBounds.preprocessingBounds.emplace();
+        precomputedBeliefBounds.preprocessingBounds->lower.emplace_back(data.model->getNumberOfStates(), storm::utility::zero<POMDPValueType>());
+        precomputedBeliefBounds.preprocessingBounds->upper.emplace_back(data.model->getNumberOfStates(), storm::utility::one<POMDPValueType>());
+
+        storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
+        options.buildChoiceLabeling = false;
+        options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+        options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+
+        std::vector<std::string> rewardModelNames;
+        for (auto const& rewardBound : data.propertyInfo->rewardBounds) {
+            rewardModelNames.push_back(rewardBound.rewardModelName);
+        }
+        auto const result = checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds, rewardModelNames);
+
+        auto const expected = this->template parseNumber<BeliefMDPValueType>(expectedValue);
+        EXPECT_TRUE(result.completedExploration);
+        EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>());
+    };
+
+    check("Pmax=? [ true Urew<=3 \"goal\" ]", "7/10");
+    check("Pmin=? [ true Urew<=3 \"goal\" ]", "3/10");
+}
+
+TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_early_frontier_uses_cutoff) {
+    typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
+    typedef typename TestFixture::POMDPValueType POMDPValueType;
+    typedef typename TestFixture::BeliefValueType BeliefValueType;
+    typedef typename TestFixture::BeliefMDPValueType BeliefMDPValueType;
+
+    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism", "Pmin=? [ true Urew<=3 \"goal\" ]", "slippery=0");
+    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, BeliefValueType, BeliefMDPValueType> checker(*data.model);
+    storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> precomputedBeliefBounds;
+    precomputedBeliefBounds.preprocessingBounds.emplace();
+    precomputedBeliefBounds.preprocessingBounds->lower.emplace_back(data.model->getNumberOfStates(), storm::utility::zero<POMDPValueType>());
+    precomputedBeliefBounds.preprocessingBounds->upper.emplace_back(data.model->getNumberOfStates(), storm::utility::one<POMDPValueType>());
+
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
+    options.buildChoiceLabeling = false;
+    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+    options.maxExplorationSize = 1;
+
+    std::vector<std::string> rewardModelNames;
+    for (auto const& rewardBound : data.propertyInfo->rewardBounds) {
+        rewardModelNames.push_back(rewardBound.rewardModelName);
+    }
+    auto const result = checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds, rewardModelNames);
+
+    auto const expected = this->template parseNumber<BeliefMDPValueType>("1");
+    EXPECT_FALSE(result.completedExploration);
+    EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>());
 }
 
 #if defined STORM_HAVE_LP_SOLVER
