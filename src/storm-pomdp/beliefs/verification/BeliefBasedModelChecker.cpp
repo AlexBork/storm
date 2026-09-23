@@ -58,7 +58,7 @@ template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueTy
 typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::TerminalBeliefCallback getTerminalBeliefCallback(
     PropertyInformation const& propertyInformation, storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storm::pomdp::storage::PreprocessingPomdpValueBounds<typename PomdpModelType::ValueType> const& valueBounds) {
-    using PomdpValueType = PomdpModelType::ValueType;
+    using PomdpValueType = typename PomdpModelType::ValueType;
     if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
         if (options.maxGapToCut.has_value()) {
             // Terminate if the gap is small enough
@@ -146,7 +146,7 @@ template<typename PomdpModelType, typename BeliefType, typename BeliefMdpValueTy
 std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unordered_map<uint64_t, BeliefId>> buildBeliefMdpFromInfo(
     PropertyInformation const& propertyInformation, storm::pomdp::storage::PreprocessingPomdpValueBounds<typename PomdpModelType::ValueType> const& valueBounds,
     InfoType const& info) {
-    using PomdpValueType = PomdpModelType::ValueType;
+    using PomdpValueType = typename PomdpModelType::ValueType;
     std::function<std::unordered_map<std::string, BeliefMdpValueType>(BeliefType const&)> computeCutOffValueMap =
         [&valueBounds, &propertyInformation](BeliefType const& belief) {
             // Add addtional cut-off sources here

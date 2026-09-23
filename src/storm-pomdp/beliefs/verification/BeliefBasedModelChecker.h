@@ -20,7 +20,7 @@ template<typename PomdpModelType, typename BeliefValueType = typename PomdpModel
  */
 class BeliefBasedModelChecker {
    public:
-    using PomdpValueType = PomdpModelType::ValueType;
+    using PomdpValueType = typename PomdpModelType::ValueType;
     /** Creates a checker for a canonic POMDP. The POMDP must outlive the checker. */
     explicit BeliefBasedModelChecker(PomdpModelType const& pomdp);
 
