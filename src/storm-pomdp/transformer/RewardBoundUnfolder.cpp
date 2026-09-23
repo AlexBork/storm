@@ -297,6 +297,8 @@ storm::storage::sparse::ModelComponents<ValueType> constructComponents(storm::mo
                                                                        std::vector<Dimension<ValueType>> const& dimensions,
                                                                        std::set<std::string> const& preservedRewardModels,
                                                                        ExplorationResult<ValueType>&& explorationResult) {
+    STORM_LOG_WARN_COND(!originalModel.hasStateValuations(), "State valuations are not preserved in bound unfolding.");
+    STORM_LOG_WARN_COND(!originalModel.hasChoiceOrigins(), "Choice origins are not preserved in bound unfolding.");
     uint64_t const numStates = explorationResult.matrix.getColumnCount();
     uint64_t const numChoices = explorationResult.matrix.getRowCount();
 
