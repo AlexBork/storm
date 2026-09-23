@@ -79,10 +79,13 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     bool constexpr extraDataCompatibleWithRewardAwareness =
         sizeof...(ExtraTransitionData) == 1 && (std::is_same_v<std::vector<BeliefMdpValueType>, ExtraTransitionData> || ...);
 
+    auto const frontierBeliefs = explorationInformation.getFrontierBeliefs();
+    bool const initialBeliefIsTerminal = explorationInformation.terminalBeliefValues.contains(explorationInformation.initialBeliefId);
+
     // First gather all cut-off information
     uint64_t nrCutOffChoices = 0ull;
     std::unordered_map<BeliefId, std::unordered_map<std::string, BeliefMdpValueType>> cutOffInformationMap;
-    for (auto const& frontierBeliefId : explorationInformation.getFrontierBeliefs()) {
+    for (auto const& frontierBeliefId : frontierBeliefs) {
         auto const& frontierBelief = explorationInformation.discoveredBeliefs.getBeliefFromId(frontierBeliefId);
         cutOffInformationMap[frontierBeliefId] = computeCutOffValueMap(frontierBelief);
         nrCutOffChoices += cutOffInformationMap[frontierBeliefId].size();
@@ -91,13 +94,14 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     constexpr bool clippingUsed = std::is_same_v<ExplorationInformation<BeliefMdpValueType, BeliefType, ExtraTransitionData...>,
                                                  ClippingExplorationInformation<BeliefMdpValueType, BeliefType>>;
 
-    // (unbounded) reachability probabilities get a dedicated target state as an extra state
-    // This is not done for reward-bounded reachability probabilities because target states are not terminal for those (e.g. because of lower reward bounds)
-    // Possible optimisation: check if bottom is really needed for clipping
-    uint64_t const numBottomTargetStates = isReachProb || clippingUsed ? 2ull : 1ull;
-    uint64_t const numExtraStates = numBottomTargetStates + explorationInformation.getFrontierBeliefs().size();
+    // Reachability probabilities and reward-bounded cut-offs get dedicated target and bottom states.
+    // The target state used for reward-bounded cut-offs is distinct from ordinary target beliefs, which are not terminal
+    // (e.g. because of lower reward bounds).
+    uint64_t const numBottomTargetStates = isReachProb || isRewBndReachProb || clippingUsed ? 2ull : 1ull;
+    uint64_t const numInitialTerminalStates = initialBeliefIsTerminal ? 1ull : 0ull;
+    uint64_t const numExtraStates = numBottomTargetStates + frontierBeliefs.size() + numInitialTerminalStates;
     uint64_t const numStates = explorationInformation.matrix.groups() + numExtraStates;
-    uint64_t const numChoices = explorationInformation.matrix.rows() + numBottomTargetStates + nrCutOffChoices;
+    uint64_t const numChoices = explorationInformation.matrix.rows() + numBottomTargetStates + nrCutOffChoices + numInitialTerminalStates;
     uint64_t const targetState = numStates - numBottomTargetStates;
     uint64_t const bottomState = numStates - 1;
     std::optional<models::sparse::ChoiceLabeling> optionalChoiceLabeling;
@@ -109,8 +113,9 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     if (isTotRew) {
         actionRewards.reserve(numChoices);
         actionRewards.insert(actionRewards.end(), explorationInformation.actionRewards.begin(), explorationInformation.actionRewards.end());
-        // Insert 0 for all cut-off choices and bottom state
-        actionRewards.insert(actionRewards.end(), nrCutOffChoices + numBottomTargetStates, storm::utility::zero<BeliefMdpValueType>());
+        // Insert 0 for all cut-off choices, an optional initial terminal state, and bottom/target states.
+        actionRewards.insert(actionRewards.end(), nrCutOffChoices + numInitialTerminalStates + numBottomTargetStates,
+                             storm::utility::zero<BeliefMdpValueType>());
         STORM_LOG_ASSERT(numChoices == actionRewards.size(),
                          "Unexpected size of action rewards: Expected " << numChoices << " got " << actionRewards.size() << ".");
     }
@@ -118,6 +123,16 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     std::unordered_map<BeliefId, uint64_t> frontierBeliefToStateMap;
     std::unordered_map<uint64_t, BeliefId> stateToFrontierBeliefMap;
     uint64_t nextStateId = numStates - numExtraStates;
+    std::optional<uint64_t> initialTerminalState;
+    if (initialBeliefIsTerminal) {
+        initialTerminalState = nextStateId++;
+    }
+    for (auto const& frontierBeliefId : frontierBeliefs) {
+        frontierBeliefToStateMap.emplace(frontierBeliefId, nextStateId);
+        stateToFrontierBeliefMap.emplace(nextStateId, frontierBeliefId);
+        ++nextStateId;
+    }
+    STORM_LOG_ASSERT(nextStateId == targetState, "Unexpected state layout.");
 
     std::vector<storm::storage::SparseMatrixBuilder<BeliefMdpValueType>> transitionRewardBuilderVector;
 
@@ -155,33 +170,6 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                             }
                         }
                     }
-                    if constexpr (clippingUsed) {
-                        // In case of clipping exploration, we have extra data that indicates whether the transition is a clipping transition
-                        auto const& clippingProbability = std::get<0>(entry.data);
-                        auto const& rewardPenalty = std::get<1>(entry.data);
-
-                        if (clippingProbability) {
-                            if (isReachProb) {
-                                if (storm::solver::minimize(propertyInformation.dir)) {
-                                    probabilityToTarget += *clippingProbability;
-                                } else {
-                                    probabilityToBottom += *clippingProbability;
-                                }
-                            } else if (rewardPenalty) {
-                                if (storm::utility::isInfinity(*rewardPenalty)) {
-                                    /* Infinite reward on transitions is not correctly handled by the model checker. Therefore, we treat it by adding a
-                                     * transition to the bottom state which due to the semantics of expected reward until reaching a target has infinite
-                                     * expected reward.This causes the expected reward for the transition to become infinite. */
-                                    probabilityToBottom += *clippingProbability;
-                                } else {
-                                    actionRewards[choice] += *rewardPenalty;
-                                    probabilityToTarget += *clippingProbability;
-                                }
-                            } else {
-                                probabilityToTarget += *clippingProbability;
-                            }
-                        }
-                    }
                 } else {
                     // Transition to unexplored belief (either terminal or cut-off)
                     BeliefMdpValueType successorValue;
@@ -198,20 +186,44 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                         }
                     } else {
                         // Transition to frontier belief
-                        auto [insertIterator, inserted] = frontierBeliefToStateMap.insert({entry.targetBelief, nextStateId});
-                        if (inserted) {
-                            stateToFrontierBeliefMap[nextStateId] = entry.targetBelief;
-                            ++nextStateId;
-                        }
-                        transitionBuilder.addNextValue(choice, insertIterator->second, entry.probability);
+                        auto const frontierIt = frontierBeliefToStateMap.find(entry.targetBelief);
+                        STORM_LOG_ASSERT(frontierIt != frontierBeliefToStateMap.end(), "Unknown frontier belief.");
+                        transitionBuilder.addNextValue(choice, frontierIt->second, entry.probability);
                         if constexpr (extraDataCompatibleWithRewardAwareness) {
                             if (isRewBndReachProb) {
                                 for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
                                     if (!storm::utility::isZero(entry.data[i])) {
-                                        transitionRewardBuilderVector.at(i).addNextValue(choice, insertIterator->second, entry.data[i]);
+                                        transitionRewardBuilderVector.at(i).addNextValue(choice, frontierIt->second, entry.data[i]);
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                if constexpr (clippingUsed) {
+                    // Apply clipping metadata regardless of whether the successor is explored, terminal, or on the frontier.
+                    auto const& clippingProbability = std::get<0>(entry.data);
+                    auto const& rewardPenalty = std::get<1>(entry.data);
+
+                    if (clippingProbability) {
+                        if (isReachProb) {
+                            if (storm::solver::minimize(propertyInformation.dir)) {
+                                probabilityToTarget += *clippingProbability;
+                            } else {
+                                probabilityToBottom += *clippingProbability;
+                            }
+                        } else if (rewardPenalty) {
+                            if (storm::utility::isInfinity(*rewardPenalty)) {
+                                /* Infinite reward on transitions is not correctly handled by the model checker. Therefore, we treat it by adding a
+                                 * transition to the bottom state which due to the semantics of expected reward until reaching a target has infinite
+                                 * expected reward.This causes the expected reward for the transition to become infinite. */
+                                probabilityToBottom += *clippingProbability;
+                            } else {
+                                actionRewards[choice] += *rewardPenalty;
+                                probabilityToTarget += *clippingProbability;
+                            }
+                        } else {
+                            probabilityToTarget += *clippingProbability;
                         }
                     }
                 }
@@ -235,14 +247,15 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     }
     // Treat frontier beliefs
     uint64_t choice = explorationInformation.matrix.rows();
-    for (uint64_t state = numStates - numExtraStates; state < numStates - numBottomTargetStates; ++state) {
+    uint64_t const firstFrontierState = numStates - numExtraStates + numInitialTerminalStates;
+    for (uint64_t state = firstFrontierState; state < numStates - numBottomTargetStates; ++state) {
         transitionBuilder.newRowGroup(choice);
         for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
             transitionRewardBuilder.newRowGroup(choice);
         }
         std::unordered_map<std::string, BeliefMdpValueType> cutOffInformationForBelief = cutOffInformationMap.at(stateToFrontierBeliefMap.at(state));
         for (auto const& entry : cutOffInformationForBelief) {
-            if (isReachProb) {
+            if (isReachProb || isRewBndReachProb) {
                 transitionBuilder.addNextValue(choice, targetState, entry.second);
                 transitionBuilder.addNextValue(choice, bottomState, storm::utility::one<BeliefMdpValueType>() - entry.second);
             } else {
@@ -260,6 +273,25 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
             ++choice;
         }
     }
+    if (initialTerminalState.has_value()) {
+        transitionBuilder.newRowGroup(choice);
+        BeliefMdpValueType const terminalValue = explorationInformation.terminalBeliefValues.at(explorationInformation.initialBeliefId);
+        if (isReachProb) {
+            if (!storm::utility::isZero(terminalValue)) {
+                transitionBuilder.addNextValue(choice, targetState, terminalValue);
+            }
+            BeliefMdpValueType const probabilityToBottom = storm::utility::one<BeliefMdpValueType>() - terminalValue;
+            if (!storm::utility::isZero(probabilityToBottom)) {
+                transitionBuilder.addNextValue(choice, bottomState, probabilityToBottom);
+            }
+        } else {
+            STORM_LOG_ASSERT(isTotRew, "Unexpected terminal initial belief for this property type.");
+            transitionBuilder.addNextValue(choice, targetState, storm::utility::one<BeliefMdpValueType>());
+            actionRewards[choice] += terminalValue;
+        }
+        ++choice;
+    }
+    STORM_LOG_ASSERT(choice == numChoices - numBottomTargetStates, "Unexpected choice layout.");
 
     // Treat extra states
     transitionBuilder.newRowGroup(numChoices - numBottomTargetStates);
@@ -271,11 +303,14 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     }
     transitionBuilder.addNextValue(numChoices - numBottomTargetStates, targetState, storm::utility::one<BeliefMdpValueType>());
     for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
-        transitionRewardBuilder.newRowGroup(numChoices - 1);
+        transitionRewardBuilder.newRowGroup(numChoices - numBottomTargetStates);
     }
-    if (isReachProb || clippingUsed) {
+    if (isReachProb || isRewBndReachProb || clippingUsed) {
         transitionBuilder.newRowGroup(numChoices - 1);
         transitionBuilder.addNextValue(numChoices - 1, bottomState, storm::utility::one<BeliefMdpValueType>());
+        for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
+            transitionRewardBuilder.newRowGroup(numChoices - 1);
+        }
         if (optionalChoiceLabeling.has_value()) {
             if (!optionalChoiceLabeling.value().containsLabel("__loop__")) {
                 optionalChoiceLabeling.value().addLabel("__loop__");
@@ -287,15 +322,16 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     storm::models::sparse::StateLabeling stateLabeling(numStates);
     stateLabeling.addLabel("target");
     if (isRewBndReachProb) {
+        stateLabeling.addLabelToState("target", targetState);
         for (auto const& [belId, state] : explorationInformation.exploredBeliefs) {
-            if (propertyInformation.targetObservations.count(explorationInformation.discoveredBeliefs.getBeliefFromId(belId).observation() %
-                                                             explorationInformation.nrObservationsInPomdp) > 0) {
+            if (propertyInformation.targetObservations.contains(explorationInformation.discoveredBeliefs.getBeliefFromId(belId).observation() %
+                                                                explorationInformation.nrObservationsInPomdp)) {
                 stateLabeling.addLabelToState("target", state);
             }
         }
-        for (auto const& belId : explorationInformation.getFrontierBeliefs()) {
-            if (propertyInformation.targetObservations.count(explorationInformation.discoveredBeliefs.getBeliefFromId(belId).observation() %
-                                                             explorationInformation.nrObservationsInPomdp) > 0) {
+        for (auto const& belId : frontierBeliefs) {
+            if (propertyInformation.targetObservations.contains(explorationInformation.discoveredBeliefs.getBeliefFromId(belId).observation() %
+                                                                explorationInformation.nrObservationsInPomdp)) {
                 stateLabeling.addLabelToState("target", frontierBeliefToStateMap.at(belId));
             }
         }
@@ -303,9 +339,16 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
         stateLabeling.addLabelToState("target", targetState);
     }
     stateLabeling.addLabel("init");
-    stateLabeling.addLabelToState("init", explorationInformation.exploredBeliefs.at(explorationInformation.initialBeliefId));
+    if (auto const initialExploredIt = explorationInformation.exploredBeliefs.find(explorationInformation.initialBeliefId);
+        initialExploredIt != explorationInformation.exploredBeliefs.end()) {
+        stateLabeling.addLabelToState("init", initialExploredIt->second);
+    } else if (initialTerminalState.has_value()) {
+        stateLabeling.addLabelToState("init", initialTerminalState.value());
+    } else {
+        stateLabeling.addLabelToState("init", frontierBeliefToStateMap.at(explorationInformation.initialBeliefId));
+    }
     stateLabeling.addLabel("truncated");
-    for (uint64_t state = numStates - numExtraStates; state < numStates - numBottomTargetStates; ++state) {
+    for (uint64_t state = firstFrontierState; state < numStates - numBottomTargetStates; ++state) {
         stateLabeling.addLabelToState("truncated", state);
     }
 
@@ -339,6 +382,9 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     // Frontier beliefs: mapping was built as stateToFrontierBeliefMap
     for (auto const& [stateIndex, beliefId] : stateToFrontierBeliefMap) {
         stateToBeliefMap[stateIndex] = beliefId;
+    }
+    if (initialTerminalState.has_value()) {
+        stateToBeliefMap[initialTerminalState.value()] = explorationInformation.initialBeliefId;
     }
 
     return std::make_pair(std::make_shared<storm::models::sparse::Mdp<BeliefMdpValueType>>(std::move(components)), std::move(stateToBeliefMap));
