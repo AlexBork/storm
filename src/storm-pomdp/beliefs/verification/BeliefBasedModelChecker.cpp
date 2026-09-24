@@ -289,6 +289,7 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> checkRewardAwareUnfoldOrDiscre
     BeliefExplorationType exploration(pomdp);
     using InfoType = RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>;
     auto info = exploration.template initializeExploration<InfoType>(pomdp.getNrObservations(), options.explorationQueueOrder);
+    info.generateChoiceLabeling = options.buildChoiceLabeling;
 
     // Determine terminationCallback based on options
     typename BeliefExplorationType::TerminationCallback terminationCallback =
