@@ -97,7 +97,9 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
         }
     } else if (propertyInformation.kind == PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
         return [](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
-            // For reward-bounded properties, we cannot be sure that a target belief is terminal as we are not bound-aware at this point
+            // Reward-aware exploration deliberately has no terminal beliefs. Reaching a target observation does not decide
+            // a reward-bounded property: lower bounds may require further reward accumulation, and the reward vector is
+            // encoded only on the transition. The belief MDP builder consequently receives ordinary explored/frontier edges.
             return std::nullopt;
         };
     } else if (options.maxGapToCut.has_value()) {

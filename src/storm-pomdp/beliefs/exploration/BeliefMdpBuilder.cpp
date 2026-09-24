@@ -173,6 +173,8 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                 } else {
                     // Transition to unexplored belief (either terminal or cut-off)
                     BeliefMdpValueType successorValue;
+                    // Reward-aware exploration never inserts terminal beliefs: whether a target observation satisfies a
+                    // reward bound depends on the transition reward. Those beliefs stay explored or on the frontier.
                     if (auto terminalIt = explorationInformation.terminalBeliefValues.find(entry.targetBelief);
                         // Transition to terminal belief
                         terminalIt != explorationInformation.terminalBeliefValues.end()) {
