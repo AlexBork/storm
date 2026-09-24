@@ -71,7 +71,8 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
                         .build());
     this->addOption(storm::settings::OptionBuilder(moduleName, isRewardObservableOption, false,
                                                    "Sets the option that rewards are observable for bounded reachability properties.")
-                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument("levelwidths", "comma separated list of width of reward levels.")
+                        .addArgument(storm::settings::ArgumentBuilder::createStringArgument(
+                                         "levelwidths", "comma separated list of (unsigned integer) width of reward levels.")
                                          .setDefaultValueString("")
                                          .makeOptional()
                                          .build())
