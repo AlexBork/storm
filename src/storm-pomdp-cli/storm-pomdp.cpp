@@ -1,3 +1,4 @@
+#include <optional>
 #include <type_traits>
 
 #include "storm-cli-utilities/cli.h"
@@ -18,7 +19,6 @@
 #include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
 #include "storm-pomdp/modelchecker/PreprocessingPomdpValueBoundsModelChecker.h"
-#include "storm-pomdp/storage/BeliefExplorationResult.h"
 #include "storm-pomdp/transformer/ApplyFiniteSchedulerToPomdp.h"
 #include "storm-pomdp/transformer/BinaryPomdpTransformer.h"
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
@@ -378,10 +378,22 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
 
     uint64_t initialPomdpState = preprocessedPomdpPtr->getInitialStates().getNextSetIndex(0);
     using ExtendedBeliefMDPType = storm::utility::ExtendedValueType<BeliefMDPType>;
-    storage::BeliefExplorationResult<ExtendedBeliefMDPType> result(
-        storm::utility::fromSentinel(beliefExplorationBounds.preprocessingBounds->template getHighestLowerBound<BeliefMDPType>(initialPomdpState)),
-        storm::utility::fromSentinel(beliefExplorationBounds.preprocessingBounds->template getSmallestUpperBound<BeliefMDPType>(initialPomdpState)));
-    STORM_LOG_INFO("Initial value bounds are [" << *result.lowerBound << ", " << *result.upperBound << "]");
+    std::optional<ExtendedBeliefMDPType> lowerBound =
+        storm::utility::fromSentinel(beliefExplorationBounds.preprocessingBounds->template getHighestLowerBound<BeliefMDPType>(initialPomdpState));
+    std::optional<ExtendedBeliefMDPType> upperBound =
+        storm::utility::fromSentinel(beliefExplorationBounds.preprocessingBounds->template getSmallestUpperBound<BeliefMDPType>(initialPomdpState));
+    STORM_LOG_INFO("Initial value bounds are [" << *lowerBound << ", " << *upperBound << "]");
+
+    auto updateLowerBound = [&lowerBound](ExtendedBeliefMDPType const& value) {
+        if (!lowerBound || value > *lowerBound) {
+            lowerBound = value;
+        }
+    };
+    auto updateUpperBound = [&upperBound](ExtendedBeliefMDPType const& value) {
+        if (!upperBound || value < *upperBound) {
+            upperBound = value;
+        }
+    };
 
     storm::pomdp::beliefs::PropertyInformation propertyInfo;
     if (rewardModelName) {
@@ -467,32 +479,32 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     }
 
     if (completedExploration && !belExplSettings.isUseClippingSet()) {
-        result.updateLowerBound(underResultValue);
-        result.updateUpperBound(underResultValue);
+        updateLowerBound(underResultValue);
+        updateUpperBound(underResultValue);
     } else {
         if (isOverApproximation) {
             if (storm::solver::maximize(propertyInfo.dir)) {
-                result.updateUpperBound(overResultValue);
+                updateUpperBound(overResultValue);
                 if (!isUnderApproximation) {
-                    result.removeLowerBound();
+                    lowerBound.reset();
                 }
             } else {
-                result.updateLowerBound(overResultValue);
+                updateLowerBound(overResultValue);
                 if (!isUnderApproximation) {
-                    result.removeUpperBound();
+                    upperBound.reset();
                 }
             }
         }
         if (isUnderApproximation) {
             if (storm::solver::maximize(propertyInfo.dir)) {
-                result.updateLowerBound(underResultValue);
+                updateLowerBound(underResultValue);
                 if (!isOverApproximation) {
-                    result.removeUpperBound();
+                    upperBound.reset();
                 }
             } else {
-                result.updateUpperBound(underResultValue);
+                updateUpperBound(underResultValue);
                 if (!isOverApproximation) {
-                    result.removeLowerBound();
+                    lowerBound.reset();
                 }
             }
         }
@@ -503,7 +515,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     } else {
         STORM_PRINT_AND_LOG("\nResult: ");
     }
-    printResult(result.lowerBound, result.upperBound);
+    printResult(lowerBound, upperBound);
     STORM_PRINT_AND_LOG('\n');
     return true;
 }
