@@ -404,8 +404,8 @@ storm::storage::sparse::ModelComponents<ValueType> constructComponents(storm::mo
         STORM_LOG_WARN_COND(!pomdp.hasObservationValuations(), "Observation valuations are dropped.");
 
     } else {
-        STORM_LOG_THROW(originalModel.isOfType(storm::models::ModelType::Mdp), storm::exceptions::NotSupportedException,
-                        "Unfolding is only supported POMDP and MDP models right now.");  // DTMCs might work, too?
+        STORM_LOG_THROW(originalModel.isOfType(storm::models::ModelType::Mdp) || originalModel.isOfType(storm::models::ModelType::Dtmc),
+                        storm::exceptions::NotSupportedException, "Unfolding is only supported for POMDPs, MDPs and DTMCs.");
     }
     return components;
 }
@@ -461,6 +461,9 @@ std::shared_ptr<storm::logic::Formula> constructFormula(storm::logic::BoundedUnt
 template<typename ValueType>
 RewardBoundUnfolder<ValueType>::ReturnType RewardBoundUnfolder<ValueType>::transform(storm::models::sparse::Model<ValueType> const& model,
                                                                                      storm::logic::Formula const& formula, UnfoldingOptions const& options) {
+    STORM_LOG_THROW(model.getType() == storm::models::ModelType::Pomdp || model.getType() == storm::models::ModelType::Mdp ||
+                        model.getType() == storm::models::ModelType::Dtmc,
+                    storm::exceptions::NotSupportedException, "Reward bound unfolding is only supported for POMDPs, MDPs and DTMCs.");
     if (formula.isProbabilityOperatorFormula()) {
         // Recursive call with subformula
         auto const& opFormula = formula.asProbabilityOperatorFormula();
