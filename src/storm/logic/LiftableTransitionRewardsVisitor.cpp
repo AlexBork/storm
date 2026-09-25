@@ -178,7 +178,15 @@ bool LiftableTransitionRewardsVisitor::rewardModelHasTransitionRewards(std::stri
         if (symbolicModelDescription.isJaniModel()) {
             return storm::jani::RewardModelInformation(symbolicModelDescription.asJaniModel(), rewardModelName).hasTransitionRewards();
         } else if (symbolicModelDescription.isPrismProgram()) {
-            return symbolicModelDescription.asPrismProgram().getRewardModel(rewardModelName).hasTransitionRewards();
+            auto const& program = symbolicModelDescription.asPrismProgram();
+            if (program.hasRewardModel(rewardModelName)) {
+                return program.getRewardModel(rewardModelName).hasTransitionRewards();
+            }
+            STORM_LOG_THROW(rewardModelName.empty(), storm::exceptions::IllegalArgumentException,
+                            "Cannot find unknown reward model '" << rewardModelName << "'.");
+            STORM_LOG_THROW(program.getNumberOfRewardModels() == 1, storm::exceptions::IllegalArgumentException,
+                            "Reference to standard reward model is ambiguous.");
+            return program.getRewardModel(0).hasTransitionRewards();
         }
     }
     return false;
