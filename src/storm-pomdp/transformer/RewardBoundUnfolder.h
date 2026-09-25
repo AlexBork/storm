@@ -39,7 +39,8 @@ class RewardBoundUnfolder {
     };
 
     /**
-     * Unfolds reward-bounded dimensions into the model state space and returns an equivalent unbounded formula.
+     * Unfolds reward-bounded dimensions into the model state space and returns an equivalent formula.
+     * @see sections 4 and 5 of https://doi.org/10.18154/RWTH-2025-08686 for a formal definition of this transformation
      *
      * Zero level widths unfold a dimension completely and remove its bound. Positive level widths retain a compact
      * epoch representation and introduce a corresponding level reward model.
