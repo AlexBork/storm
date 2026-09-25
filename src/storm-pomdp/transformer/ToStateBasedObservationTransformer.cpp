@@ -32,9 +32,10 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     std::vector<ObservationType> transitionTargetObservations;
     transitionTargetObservations.reserve(transitionMatrix.getEntryCount());
     for (uint64_t state = 0; state < transitionMatrix.getRowGroupCount(); ++state) {
+        auto const firstChoice = transitionMatrix.getRowGroupIndices()[state];
         for (auto choice : transitionMatrix.getRowGroupIndices(state)) {
             for (auto const& entry : transitionMatrix.getRow(choice)) {
-                auto const obs = transitionObservationFunction(state, choice, entry.getColumn());
+                auto const obs = transitionObservationFunction(state, choice - firstChoice, entry.getColumn());
                 transitionTargetObservations.push_back(obs);
                 auto& obsSet = stateObservations[entry.getColumn()];
                 if (std::find(obsSet.begin(), obsSet.end(), obs) == obsSet.end()) {
@@ -209,6 +210,7 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     auto result = transform(
         pomdp,
         [&pomdp, &getOrAddObservationIndex, &observableRewardModels](StateIdType srcState, ActionIdType action, StateIdType targetState) {
+            auto const globalChoice = pomdp.getTransitionMatrix().getRowGroupIndices()[srcState] + action;
             TransitionObservation obs{pomdp.getObservation(targetState), {}};
             for (auto const& rewName : observableRewardModels) {
                 auto const& rewModel = pomdp.getRewardModel(rewName);
@@ -217,7 +219,7 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
                     obs.rewards.back() += rewModel.getStateReward(srcState);
                 }
                 if (rewModel.hasStateActionRewards()) {
-                    obs.rewards.back() += rewModel.getStateActionReward(action);
+                    obs.rewards.back() += rewModel.getStateActionReward(globalChoice);
                 }
                 STORM_LOG_THROW(!rewModel.hasTransitionRewards(), storm::exceptions::NotSupportedException,
                                 "Transition rewards are currently not supported in this context.");
