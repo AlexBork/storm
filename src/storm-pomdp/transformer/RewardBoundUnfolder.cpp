@@ -102,10 +102,12 @@ std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model
                             "Bound " << formulaDim << " is not an integer");  // might support rational via scaling (how to scale levelWidth?)
             int64_t const threshold =
                 boundedUntilFormula.getLowerBound(formulaDim).evaluateAsInt() - (boundedUntilFormula.isLowerBoundStrict(formulaDim) ? 0ul : 1ul);
-            STORM_LOG_THROW(threshold >= 0, storm::exceptions::NotSupportedException,
-                            "Lower reward bound in dimension " << formulaDim << " is not satisfiable.");
-            dimensions.push_back(
-                Dimension<ValueType>{Dimension<ValueType>::Relation::greater, threshold, levelWidth, getFreshIdentifier(), formulaDim, rewardModel});
+            if (threshold >= 0) {
+                dimensions.push_back(
+                    Dimension<ValueType>{Dimension<ValueType>::Relation::greater, threshold, levelWidth, getFreshIdentifier(), formulaDim, rewardModel});
+            } else {
+                STORM_LOG_WARN("Lower reward bound in dimension " << formulaDim << " is trivially satisfied and therefore dropped.");
+            }
         }
     }
     return dimensions;
