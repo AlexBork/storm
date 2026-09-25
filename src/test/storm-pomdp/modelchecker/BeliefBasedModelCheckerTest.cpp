@@ -840,6 +840,7 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_min_max) {
     typedef typename TestFixture::BeliefMDPValueType BeliefMDPValueType;
 
     auto check = [this](std::string const& formula, std::string const& expectedValue) {
+        SCOPED_TRACE(formula);
         auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism", formula, "slippery=0");
         storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, BeliefValueType, BeliefMDPValueType> checker(*data.model);
         storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> precomputedBeliefBounds;
@@ -856,15 +857,26 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_min_max) {
         for (auto const& rewardBound : data.propertyInfo->rewardBounds) {
             rewardModelNames.push_back(rewardBound.rewardModelName);
         }
-        auto const result = checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds, rewardModelNames);
-
         auto const expected = this->template parseNumber<BeliefMDPValueType>(expectedValue);
-        EXPECT_TRUE(result.completedExploration);
-        EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>());
+        for (bool const discretize : {false, true}) {
+            SCOPED_TRACE(discretize ? "discretize" : "unfold");
+            // Resolution 10 represents the model's (0.7, 0.3) beliefs exactly.
+            auto const result =
+                discretize ? checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, precomputedBeliefBounds, rewardModelNames)
+                           : checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds, rewardModelNames);
+            EXPECT_TRUE(result.completedExploration);
+            EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>());
+        }
     };
 
+    // The goal is first reachable after three unit rewards; the scheduler chooses between success probabilities 0.3 and 0.7.
     check("Pmax=? [ true Urew<=3 \"goal\" ]", "7/10");
     check("Pmin=? [ true Urew<=3 \"goal\" ]", "3/10");
+    check("Pmax=? [ true Urew<=2 \"goal\" ]", "0");
+    check("Pmin=? [ true Urew<=2 \"goal\" ]", "0");
+    // Target beliefs must remain explorable: their rewarded self-loop can satisfy a lower bound after the first visit.
+    check("Pmax=? [ true Urew>=4 \"goal\" ]", "7/10");
+    check("Pmin=? [ true Urew>=4 \"goal\" ]", "3/10");
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_early_frontier_uses_cutoff) {
@@ -873,27 +885,43 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_early_frontier_use
     typedef typename TestFixture::BeliefValueType BeliefValueType;
     typedef typename TestFixture::BeliefMDPValueType BeliefMDPValueType;
 
-    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism", "Pmin=? [ true Urew<=3 \"goal\" ]", "slippery=0");
-    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, BeliefValueType, BeliefMDPValueType> checker(*data.model);
-    storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> precomputedBeliefBounds;
-    precomputedBeliefBounds.preprocessingBounds.emplace();
-    precomputedBeliefBounds.preprocessingBounds->lower.emplace_back(data.model->getNumberOfStates(), storm::utility::zero<POMDPValueType>());
-    precomputedBeliefBounds.preprocessingBounds->upper.emplace_back(data.model->getNumberOfStates(), storm::utility::one<POMDPValueType>());
+    auto check = [this](std::string const& formula, std::string const& expectedValue) {
+        SCOPED_TRACE(formula);
+        auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism", formula, "slippery=0");
+        storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, BeliefValueType, BeliefMDPValueType> checker(*data.model);
+        storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> precomputedBeliefBounds;
+        precomputedBeliefBounds.preprocessingBounds.emplace();
+        precomputedBeliefBounds.preprocessingBounds->lower.emplace_back(data.model->getNumberOfStates(), storm::utility::zero<POMDPValueType>());
+        precomputedBeliefBounds.preprocessingBounds->upper.emplace_back(data.model->getNumberOfStates(), storm::utility::one<POMDPValueType>());
 
-    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
-    options.buildChoiceLabeling = false;
-    options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
-    options.maxExplorationSize = 1;
+        storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
+        options.buildChoiceLabeling = false;
+        options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+        options.maxExplorationSize = 1;
 
-    std::vector<std::string> rewardModelNames;
-    for (auto const& rewardBound : data.propertyInfo->rewardBounds) {
-        rewardModelNames.push_back(rewardBound.rewardModelName);
-    }
-    auto const result = checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds, rewardModelNames);
+        std::vector<std::string> rewardModelNames;
+        for (auto const& rewardBound : data.propertyInfo->rewardBounds) {
+            rewardModelNames.push_back(rewardBound.rewardModelName);
+        }
+        auto const expected = this->template parseNumber<BeliefMDPValueType>(expectedValue);
+        for (bool const discretize : {false, true}) {
+            SCOPED_TRACE(discretize ? "discretize" : "unfold");
+            auto const result =
+                discretize ? checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, precomputedBeliefBounds, rewardModelNames)
+                           : checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, precomputedBeliefBounds, rewardModelNames);
+            EXPECT_FALSE(result.completedExploration);
+            EXPECT_EQ(result.statistics.exploredBeliefs, 1);
+            EXPECT_GT(result.statistics.discoveredBeliefs, result.statistics.exploredBeliefs);
+            EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>());
+        }
+    };
 
-    auto const expected = this->template parseNumber<BeliefMDPValueType>("1");
-    EXPECT_FALSE(result.completedExploration);
-    EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>());
+    // With only the initial belief explored, minimization uses the upper cut-off and maximization the lower cut-off.
+    check("Pmin=? [ true Urew<=3 \"goal\" ]", "1");
+    check("Pmax=? [ true Urew<=3 \"goal\" ]", "0");
+    // The first transition still costs one reward: even the upper cut-off must fail a zero reward budget.
+    check("Pmin=? [ true Urew<=0 \"goal\" ]", "0");
+    check("Pmax=? [ true Urew<=0 \"goal\" ]", "0");
 }
 
 #if defined STORM_HAVE_LP_SOLVER
