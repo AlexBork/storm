@@ -26,7 +26,7 @@ class RewardBoundUnfolder {
         /// The returned formula will then have a rewardBound in terms of the new level reward.
         /// Assume a dimension i. Let c=levelWidth[i]!=0 and let t be the reward bound threshold (i.e. either <=t or >t).
         /// A transition from epoch a=e[i] with reward b=r[i] leads to epoch (a-b) mod c and yields level reward ceil((b-a)/c).
-        /// The initial epoch is -t mod c (Note: in C++ this is (-t)%c+c because % is not the modulos for negative numerators).
+        /// The initial epoch is t mod c, so the first level reward is earned when the accumulated reward exceeds t mod c.
         /// The output formula will have reward bound threshold floor(t/c), where t is the original threshold.
         /// Note that if c=1, no unfolding will be performed.
         /// The case levelWidth[i]=0 is special: this means that the dimension is unfolded until past the threshold.
