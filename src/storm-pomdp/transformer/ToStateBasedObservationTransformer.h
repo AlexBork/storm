@@ -27,6 +27,7 @@ class ToStateBasedObservationTransformer {
      * Specifically, the observation assigned to the state is equal to the transition-observation with which the state has been entered.
      * This might require to create copies of states that can be entered with different observations.
      * Initial states retain @p initialObservation.
+     * Non-initial states without incoming transitions retain one copy with @p initialObservation.
      */
     static std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> transform(storm::models::sparse::Mdp<ValueType> const& mdp,
                                                                               TransitionObservationFunction const& transitionObservationFunction,

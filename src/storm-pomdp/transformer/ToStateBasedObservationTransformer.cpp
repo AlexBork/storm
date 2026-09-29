@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "storm/adapters/RationalNumberAdapter.h"
-#include "storm/exceptions/InvalidModelException.h"
 #include "storm/exceptions/NotSupportedException.h"
 #include "storm/utility/builder.h"
 #include "storm/utility/macros.h"
@@ -18,6 +17,7 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     storm::models::sparse::Mdp<ValueType> const& mdp, TransitionObservationFunction const& transitionObservationFunction, ObservationType initialObservation) {
     STORM_LOG_WARN_COND(!mdp.hasStateValuations(), "State valuations are not preserved in transformation to state-based observations.");
     STORM_LOG_WARN_COND(!mdp.hasChoiceOrigins(), "Choice origins are not preserved in transformation to state-based observations.");
+    // TODO: add option to drop unreachable states
 
     auto const& transitionMatrix = mdp.getTransitionMatrix();
 
@@ -49,9 +49,12 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     std::vector<uint64_t> stateOffsets;
     stateOffsets.reserve(mdp.getNumberOfStates() + 1);
     stateOffsets.push_back(0);
-    for (uint64_t offset = 0; auto const& obsSet : stateObservations) {
-        STORM_LOG_THROW(!obsSet.empty(), storm::exceptions::InvalidModelException,
-                        "There are states that are neither initial nor have an incoming transition.");
+    for (uint64_t offset = 0; auto& obsSet : stateObservations) {
+        // A state with no incoming transition and no initial observation is unreachable. Give it
+        // one copy with an arbitrary observation so its choices, labels, and rewards remain intact.
+        if (obsSet.empty()) {
+            obsSet.push_back(initialObservation);
+        }
         offset += obsSet.size();
         stateOffsets.push_back(offset);
     }
