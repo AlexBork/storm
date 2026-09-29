@@ -889,7 +889,7 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_requires_explicit_reward_
     auto program = storm::api::parseProgram(programFile).preprocess("slippery=0");
     auto unnamedFormula = storm::api::parsePropertiesForPrismProgram("Pmax=? [ true Urew<=3 \"goal\" ]", program).front().getRawFormula();
 
-    EXPECT_THROW(storm::pomdp::analysis::getFormulaInformation(*data.model, *unnamedFormula), storm::exceptions::NotSupportedException);
+    STORM_SILENT_EXPECT_THROW(storm::pomdp::analysis::getFormulaInformation(*data.model, *unnamedFormula), storm::exceptions::NotSupportedException);
 
     auto unnamedProperty = *data.propertyInfo;
     unnamedProperty.rewardBounds.front().rewardModelName.clear();
@@ -898,7 +898,7 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_requires_explicit_reward_
         checker(*data.model);
     storm::pomdp::storage::BeliefExplorationBounds<typename TestFixture::POMDPValueType> bounds;
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<typename TestFixture::BeliefMDPValueType> options;
-    EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), unnamedProperty, options, bounds, {"rew"}), storm::exceptions::NotSupportedException);
+    STORM_SILENT_EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), unnamedProperty, options, bounds, {"rew"}), storm::exceptions::NotSupportedException);
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_requires_matching_reward_model_selection) {
@@ -910,15 +910,17 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_requires_matching_reward_
     storm::pomdp::storage::BeliefExplorationBounds<typename TestFixture::POMDPValueType> bounds;
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
 
-    EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {}), storm::exceptions::IllegalArgumentException);
-    EXPECT_THROW(checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, bounds, {}),
-                 storm::exceptions::IllegalArgumentException);
-    EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {"other"}), storm::exceptions::IllegalArgumentException);
-    EXPECT_THROW(checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, bounds, {"other", "rew"}),
-                 storm::exceptions::IllegalArgumentException);
+    STORM_SILENT_EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {}),
+                              storm::exceptions::IllegalArgumentException);
+    STORM_SILENT_EXPECT_THROW(checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, bounds, {}),
+                              storm::exceptions::IllegalArgumentException);
+    STORM_SILENT_EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {"other"}),
+                              storm::exceptions::IllegalArgumentException);
+    STORM_SILENT_EXPECT_THROW(checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, bounds, {"other", "rew"}),
+                              storm::exceptions::IllegalArgumentException);
 
     storm::pomdp::beliefs::RewardBoundedBeliefSplitter<BeliefMDPValueType, POMDPType, BeliefType> splitter(*data.model);
-    EXPECT_THROW(splitter.setRewardModels({}), storm::exceptions::IllegalArgumentException);
+    STORM_SILENT_EXPECT_THROW(splitter.setRewardModels({}), storm::exceptions::IllegalArgumentException);
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_allows_additional_observed_reward_model) {
