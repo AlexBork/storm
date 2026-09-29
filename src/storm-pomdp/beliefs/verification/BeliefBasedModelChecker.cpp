@@ -300,6 +300,7 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> checkRewardAwareUnfoldOrDiscre
     storm::OptionalRef<FreudenthalTriangulationBeliefAbstraction<BeliefType>> abstraction = {}) {
     BeliefBasedModelCheckerStatistics statistics;
     STORM_LOG_ASSERT(propertyInformation.kind == PropertyInformation::Kind::RewardBoundedReachabilityProbability, "Unexpected kind of property.");
+    STORM_LOG_THROW(!options.useClipping, storm::exceptions::NotSupportedException, "Grid clipping is not supported for reward-bounded POMDP properties.");
     STORM_LOG_ASSERT(rewardSplitter.getNumberOfSetRewardModels() != 0, "rewardSplitter must have a reward model set for reward-aware belief MDP construction.");
 
     STORM_LOG_INFO("Exploring the belief space.");

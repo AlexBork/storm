@@ -54,7 +54,9 @@ BeliefExplorationSettings::BeliefExplorationSettings() : ModuleSettings(moduleNa
                                          .build())
                         .build());
     this->addOption(
-        storm::settings::OptionBuilder(moduleName, clippingOption, false, "If this is set, unfolding will use grid clipping in addition to cut-offs.").build());
+        storm::settings::OptionBuilder(moduleName, clippingOption, false,
+                                       "If set, unfolding uses grid clipping in addition to cut-offs. Not supported for reward-bounded POMDP properties.")
+            .build());
     this->addOption(
         storm::settings::OptionBuilder(moduleName, cutZeroGapOption, false, "Cut beliefs where the gap between over- and underapproximation is 0.").build());
     this->addOption(storm::settings::OptionBuilder(moduleName, inexactPreprocessingOption, false,

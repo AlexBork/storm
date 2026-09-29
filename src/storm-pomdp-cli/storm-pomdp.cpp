@@ -277,6 +277,8 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
                               storm::pomdp::analysis::FormulaInformation const& formulaInfo, storm::logic::Formula const& formula) {
     auto const& pomdpSettings = storm::settings::getModule<storm::settings::modules::POMDPSettings>();
     auto const& belExplSettings = storm::settings::getModule<storm::settings::modules::BeliefExplorationSettings>();
+    STORM_LOG_THROW(!formulaInfo.isBounded() || !belExplSettings.isUseClippingSet(), storm::exceptions::NotSupportedException,
+                    "Grid clipping is not supported for reward-bounded POMDP properties.");
     storm::Environment env;
 
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPType> revisedOptions;
