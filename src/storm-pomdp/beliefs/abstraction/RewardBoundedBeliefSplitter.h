@@ -50,6 +50,9 @@ class RewardBoundedBeliefSplitter {
         });
 
         for (auto& [rewardVector, builder] : splitBeliefs) {
+            // Index 0 shares the original POMDP observation encoding used by the initial belief.
+            // The initial occurrence has no incoming reward; generated successors carry their reward vector
+            // on the transition. Do not infer an initial reward from the observation value.
             BeliefActionObservationType const freshIndex = rewardVectorToIndex.size();
             auto const rewVectorIndex = rewardVectorToIndex.emplace(rewardVector, freshIndex).first->second;
             builder.setObservation(belief.observation());
