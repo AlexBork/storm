@@ -688,7 +688,7 @@ void processFormula(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>>&& p
         if (pomdpSettings.isRewardObservableSet() && levelWidths.empty()) {
             formula->gatherReferencedRewardModels(rewardModelsToObserve);  // keep rewards to make them observable later
         }
-        if (pomdpSettings.isBoundedToUnboundedReachabilityTransformationSet()) {
+        if (pomdpSettings.isBoundedToUnboundedReachabilityTransformationSet() && formula->asOperatorFormula().getSubformula().isBoundedUntilFormula()) {
             STORM_PRINT_AND_LOG("Perform explicit unfolding of reward bounds.\n");
             typename transformer::RewardBoundUnfolder<ValueType>::UnfoldingOptions options;
             options.preservedRewardModels = rewardModelsToObserve;
