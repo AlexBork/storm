@@ -98,7 +98,11 @@ void BoundedUntilFormula::gatherAtomicLabelFormulas(std::vector<std::shared_ptr<
 void BoundedUntilFormula::gatherReferencedRewardModels(std::set<std::string>& referencedRewardModels) const {
     for (unsigned i = 0; i < this->getDimension(); ++i) {
         if (this->getTimeBoundReference(i).isRewardBound()) {
-            referencedRewardModels.insert(this->getTimeBoundReference(i).getOptionalRewardModelName().get_value_or(""));
+            if (!this->getTimeBoundReference(i).hasRewardModelName()) {
+                referencedRewardModels.insert("");
+            } else {
+                referencedRewardModels.insert(this->getTimeBoundReference(i).getRewardName());
+            }
         }
     }
     if (hasMultiDimensionalSubformulas()) {

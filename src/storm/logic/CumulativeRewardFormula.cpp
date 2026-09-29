@@ -49,7 +49,7 @@ boost::any CumulativeRewardFormula::accept(FormulaVisitor const& visitor, boost:
 void CumulativeRewardFormula::gatherReferencedRewardModels(std::set<std::string>& referencedRewardModels) const {
     for (unsigned i = 0; i < this->getDimension(); ++i) {
         if (getTimeBoundReference(i).isRewardBound()) {
-            referencedRewardModels.insert(this->getTimeBoundReference(i).getOptionalRewardModelName().get_value_or(""));
+            referencedRewardModels.insert(this->getTimeBoundReference(i).getRewardName());
         }
     }
 }

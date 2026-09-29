@@ -38,8 +38,7 @@ boost::any LiftableTransitionRewardsVisitor::visit(BooleanLiteralFormula const&,
 
 boost::any LiftableTransitionRewardsVisitor::visit(BoundedUntilFormula const& f, boost::any const& data) const {
     for (unsigned i = 0; i < f.getDimension(); ++i) {
-        if (f.getTimeBoundReference(i).isRewardBound() &&
-            rewardModelHasTransitionRewards(f.getTimeBoundReference(i).getOptionalRewardModelName().get_value_or(""))) {
+        if (f.getTimeBoundReference(i).isRewardBound() && rewardModelHasTransitionRewards(f.getTimeBoundReference(i).getRewardName())) {
             return false;
         }
     }
