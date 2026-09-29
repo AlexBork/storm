@@ -991,6 +991,56 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_early_frontier_use
     check("Pmax=? [ true Urew{\"rew\"}<=0 \"goal\" ]", "0");
 }
 
+TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_hidden_transition_costs) {
+    using POMDPValueType = typename TestFixture::POMDPValueType;
+    using BeliefValueType = typename TestFixture::BeliefValueType;
+    using BeliefMDPValueType = typename TestFixture::BeliefMDPValueType;
+    using POMDPType = storm::models::sparse::Pomdp<POMDPValueType>;
+
+    auto check = [this](std::string const& formula, std::string const& expectedValue, bool stopAtTargetFrontier) {
+        SCOPED_TRACE(formula);
+        auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/hidden_transition_rewards.prism", formula);
+        storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, BeliefValueType, BeliefMDPValueType> checker(*data.model);
+        storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> bounds;
+        bounds.preprocessingBounds.emplace();
+        bounds.preprocessingBounds->lower.emplace_back(data.model->getNumberOfStates(), storm::utility::zero<POMDPValueType>());
+        bounds.preprocessingBounds->upper.emplace_back(data.model->getNumberOfStates(), storm::utility::one<POMDPValueType>());
+
+        storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
+        options.explorationQueueOrder = storm::pomdp::beliefs::ExplorationQueueOrder::FIFO;
+        if (stopAtTargetFrontier) {
+            // Explore the draw and finish actions, leaving the target beliefs on the frontier.
+            options.maxExplorationSize = 2;
+        }
+
+        auto const expected = this->template parseNumber<BeliefMDPValueType>(expectedValue);
+        for (bool const discretize : {false, true}) {
+            SCOPED_TRACE(discretize ? "discretize" : "unfold");
+            auto const result = discretize ? checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 2, false, bounds, {"cost"})
+                                           : checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {"cost"});
+            EXPECT_EQ(result.completedExploration, !stopAtTargetFrontier);
+            if (stopAtTargetFrontier) {
+                EXPECT_EQ(result.statistics.exploredBeliefs, 2);
+                EXPECT_GT(result.statistics.discoveredBeliefs, result.statistics.exploredBeliefs);
+            }
+            EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>())
+                << "actual: " << result.value << ", expected: " << expected;
+        }
+    };
+
+    // The hidden states have the same observation, but finishing costs one or two rewards respectively.
+    check("Pmin=? [ true Urew{\"cost\"}<=1 \"goal\" ]", "1/2", false);
+    check("Pmax=? [ true Urew{\"cost\"}<=1 \"goal\" ]", "1/2", false);
+    check("Pmin=? [ true Urew{\"cost\"}<=2 \"goal\" ]", "1", false);
+    check("Pmax=? [ true Urew{\"cost\"}<=2 \"goal\" ]", "1", false);
+    // A target reached at cost one may keep accumulating reward before satisfying a lower bound.
+    check("Pmin=? [ true Urew{\"cost\"}>=2 \"goal\" ]", "1", false);
+    check("Pmax=? [ true Urew{\"cost\"}>=2 \"goal\" ]", "1", false);
+    // Target beliefs on the frontier still count as targets; the incoming edge cost decides which half succeeds.
+    check("Pmin=? [ true Urew{\"cost\"}<=1 \"goal\" ]", "1/2", true);
+    check("Pmax=? [ true Urew{\"cost\"}<=1 \"goal\" ]", "1/2", true);
+}
+
 #if defined STORM_HAVE_LP_SOLVER
 TYPED_TEST(BeliefBasedModelCheckerTest, clip_simple_Pmax) {
     typedef storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType> POMDPType;
