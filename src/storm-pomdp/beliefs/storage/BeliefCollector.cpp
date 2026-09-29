@@ -23,7 +23,7 @@ BeliefType const& BeliefCollector<BeliefType>::getBeliefFromId(BeliefId const& i
 template<typename BeliefType>
 BeliefId BeliefCollector<BeliefType>::getIdFromBelief(BeliefType const& belief) const {
     STORM_LOG_ASSERT(belief.observation() < beliefToIdMap.size(),
-                     "Unknown belief observation " << belief.observation() << ". Obervations are in [0," << beliefToIdMap.size());
+                     "Unknown belief observation " << belief.observation() << ". Observations are in [0," << beliefToIdMap.size());
     STORM_LOG_ASSERT(containsBelief(belief), "Belief " << belief.toString() << " is not present in this collector.");
     return beliefToIdMap[belief.observation()].at(belief);
 }
