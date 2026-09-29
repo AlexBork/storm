@@ -10,7 +10,7 @@
 #include "storm/models/sparse/Pomdp.h"
 
 namespace storm::pomdp::transformer {
-
+// TODO this may be moved to storm/transformer
 template<typename ValueType>
 class RewardBoundUnfolder {
    public:

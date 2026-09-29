@@ -20,6 +20,7 @@
 #include "storm/logic/ProbabilityOperatorFormula.h"
 #include "storm/modelchecker/results/ExplicitQuantitativeCheckResult.h"
 #include "storm/models/sparse/Dtmc.h"
+#include "storm/models/sparse/Mdp.h"
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/storage/SparseMatrix.h"
 #include "storm/storage/expressions/ExpressionManager.h"
@@ -31,9 +32,12 @@ namespace {
 using ValueType = storm::RationalNumber;
 using ResultValueType = storm::utility::ExtendedValueType<ValueType>;
 using DtmcType = storm::models::sparse::Dtmc<ValueType>;
+using MdpType = storm::models::sparse::Mdp<ValueType>;
 using PomdpType = storm::models::sparse::Pomdp<ValueType>;
 
-std::shared_ptr<storm::logic::Formula const> makeRewardBoundedFormula(std::optional<int64_t> lowerBound, std::optional<int64_t> upperBound) {
+std::shared_ptr<storm::logic::Formula const> makeRewardBoundedFormula(
+    std::optional<int64_t> lowerBound, std::optional<int64_t> upperBound,
+    storm::solver::OptimizationDirection direction = storm::solver::OptimizationDirection::Maximize) {
     static auto const expressionManager = std::make_shared<storm::expressions::ExpressionManager>();
     std::optional<storm::logic::TimeBound> lowerTimeBound;
     std::optional<storm::logic::TimeBound> upperTimeBound;
@@ -48,8 +52,7 @@ std::shared_ptr<storm::logic::Formula const> makeRewardBoundedFormula(std::optio
                                                                            std::make_shared<storm::logic::AtomicLabelFormula>("goal"), lowerTimeBound,
                                                                            upperTimeBound, storm::logic::TimeBoundReference(boost::optional<std::string>{"r"}));
     return std::make_shared<storm::logic::ProbabilityOperatorFormula>(
-        std::move(pathFormula),
-        storm::logic::OperatorInformation(boost::optional<storm::solver::OptimizationDirection>{storm::solver::OptimizationDirection::Maximize}));
+        std::move(pathFormula), storm::logic::OperatorInformation(boost::optional<storm::solver::OptimizationDirection>{direction}));
 }
 
 storm::models::sparse::StateLabeling makeLabeling() {
@@ -78,6 +81,21 @@ std::shared_ptr<DtmcType> buildDtmc() {
     storm::storage::sparse::ModelComponents<ValueType> components(matrixBuilder.build(), makeLabeling());
     components.rewardModels.emplace("r", makeRewardModel());
     return std::make_shared<DtmcType>(std::move(components));
+}
+
+std::shared_ptr<MdpType> buildMdp() {
+    storm::storage::SparseMatrixBuilder<ValueType> matrixBuilder(0, 0, 0, false, true);
+    matrixBuilder.newRowGroup(0);
+    matrixBuilder.addNextValue(0, 1, storm::utility::one<ValueType>());
+    matrixBuilder.addNextValue(1, 1, storm::utility::one<ValueType>());
+    matrixBuilder.newRowGroup(2);
+    matrixBuilder.addNextValue(2, 1, storm::utility::one<ValueType>());
+    matrixBuilder.newRowGroup(3);
+    matrixBuilder.addNextValue(3, 2, storm::utility::one<ValueType>());
+
+    storm::storage::sparse::ModelComponents<ValueType> components(matrixBuilder.build(), makeLabeling());
+    components.rewardModels.emplace("r", storm::models::sparse::StandardRewardModel<ValueType>(std::nullopt, std::vector<ValueType>{1, 2, 0, 0}));
+    return std::make_shared<MdpType>(std::move(components));
 }
 
 std::shared_ptr<PomdpType> buildPomdp() {
@@ -116,6 +134,48 @@ TEST(RewardBoundUnfolder, FullyUnfoldedDtmcPreservesRewardBoundedProbability) {
     EXPECT_EQ(storm::models::ModelType::Dtmc, result.model->getType());
     EXPECT_TRUE(result.formula->asProbabilityOperatorFormula().getSubformula().isUntilFormula());
     EXPECT_EQ(expectedValue, getInitialValue(result.model, result.formula));
+}
+
+TEST(RewardBoundUnfolder, FullyUnfoldedMdpPreservesChoicesAndOptimalProbabilities) {
+    auto const mdp = buildMdp();
+    for (auto const direction : {storm::solver::OptimizationDirection::Maximize, storm::solver::OptimizationDirection::Minimize}) {
+        auto const formula = makeRewardBoundedFormula(std::nullopt, 1, direction);
+        auto const expectedValue = getInitialValue(mdp, formula);
+        EXPECT_EQ(direction == storm::solver::OptimizationDirection::Maximize ? storm::utility::one<ValueType>() : storm::utility::zero<ValueType>(),
+                  expectedValue);
+
+        auto const result = storm::pomdp::transformer::RewardBoundUnfolder<ValueType>::transform(*mdp, *formula);
+
+        ASSERT_EQ(storm::models::ModelType::Mdp, result.model->getType());
+        EXPECT_EQ(2u, result.model->getTransitionMatrix().getRowGroupSize(*result.model->getInitialStates().begin()));
+        EXPECT_TRUE(result.formula->asProbabilityOperatorFormula().getSubformula().isUntilFormula());
+        EXPECT_EQ(expectedValue, getInitialValue(result.model, result.formula));
+    }
+}
+
+TEST(RewardBoundUnfolder, FullyUnfoldedPomdpPreservesObservationsAndActiveBound) {
+    auto pomdp = buildPomdp();
+    pomdp->getRewardModel("r").setStateReward(1, storm::utility::one<ValueType>());
+    auto const formula = makeRewardBoundedFormula(std::nullopt, 1);
+
+    auto const result = storm::pomdp::transformer::RewardBoundUnfolder<ValueType>::transform(*pomdp, *formula);
+    auto const unfoldedPomdp = result.model->as<PomdpType>();
+
+    ASSERT_NE(nullptr, unfoldedPomdp);
+    ASSERT_EQ(4u, unfoldedPomdp->getNumberOfStates());
+    EXPECT_TRUE(unfoldedPomdp->isCanonic());
+    EXPECT_EQ(pomdp->getNrObservations(), unfoldedPomdp->getNrObservations());
+    EXPECT_EQ(pomdp->getObservation(0), unfoldedPomdp->getObservation(0));
+    EXPECT_EQ(pomdp->getObservation(1), unfoldedPomdp->getObservation(1));
+    EXPECT_EQ(pomdp->getObservation(2), unfoldedPomdp->getObservation(2));
+    EXPECT_EQ(pomdp->getObservation(1), unfoldedPomdp->getObservation(3));
+    EXPECT_TRUE(unfoldedPomdp->getStateLabeling().getStates("dim0_active").get(0));
+    EXPECT_TRUE(unfoldedPomdp->getStateLabeling().getStates("dim0_active").get(1));
+    EXPECT_TRUE(unfoldedPomdp->getStateLabeling().getStates("dim0_active").get(2));
+    EXPECT_FALSE(unfoldedPomdp->getStateLabeling().getStates("dim0_active").get(3));
+    EXPECT_TRUE(unfoldedPomdp->getStateLabeling().getStates("goal").get(1));
+    EXPECT_TRUE(unfoldedPomdp->getStateLabeling().getStates("goal").get(3));
+    EXPECT_TRUE(result.formula->asProbabilityOperatorFormula().getSubformula().isUntilFormula());
 }
 
 TEST(RewardBoundUnfolder, LevelAbstractionPreservesPomdpSpecificComponents) {
