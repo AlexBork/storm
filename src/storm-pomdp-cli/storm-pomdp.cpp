@@ -665,6 +665,14 @@ void processPomdp(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>>& pomd
 template<typename ValueType>
 void processFormula(std::shared_ptr<storm::models::sparse::Pomdp<ValueType>>&& pomdp, std::shared_ptr<storm::logic::Formula const> formula) {
     if (formula->asOperatorFormula().getSubformula().isBoundedUntilFormula()) {
+        // TODO: allow for more general reward-bounded until properties than reachability
+
+        auto const& boundedUntilFormula = formula->asOperatorFormula().getSubformula().asBoundedUntilFormula();
+        for (uint64_t i = 0; i < boundedUntilFormula.getDimension(); ++i) {
+            STORM_LOG_THROW(boundedUntilFormula.getLeftSubformula(i).isTrueFormula(), storm::exceptions::NotSupportedException,
+                            "Reward-bounded until properties for POMDPs currently require 'true' as the left-hand side, i.e., they must be reward-bounded "
+                            "reachability properties.");
+        }
         auto const& pomdpSettings = storm::settings::getModule<storm::settings::modules::POMDPSettings>();
         // Process bounded until formulas
         // If level widths are given, unfold the levels and make sure that the level rewards (and only those) are made observable

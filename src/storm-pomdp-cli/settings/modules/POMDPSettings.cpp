@@ -67,10 +67,9 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
     this->addOption(storm::settings::OptionBuilder(moduleName, isQualitativeOption, false, "Sets the option qualitative analysis").build());
     this->addOption(storm::settings::OptionBuilder(
                         moduleName, isBoundedToUnboundedReachabilityTransformationOption, false,
-                        "Sets the option that reward bounded reachability properties are transformed to an unbounded problem on an unfolded POMDP.")
+                                                   "Transforms reward-bounded reachability properties to an unbounded problem on an unfolded POMDP.")
                         .build());
-    this->addOption(storm::settings::OptionBuilder(moduleName, isRewardObservableOption, false,
-                                                   "Sets the option that rewards are observable for bounded reachability properties.")
+    this->addOption(storm::settings::OptionBuilder(moduleName, isRewardObservableOption, false, "Makes rewards observable for bounded reachability properties.")
                         .addArgument(storm::settings::ArgumentBuilder::createStringArgument(
                                          "levelwidths", "comma separated list of (unsigned integer) width of reward levels.")
                                          .setDefaultValueString("")
