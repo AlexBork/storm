@@ -40,6 +40,7 @@ void RewardBoundedBeliefSplitter<RewardValueType, PomdpType, BeliefType>::setRew
 template<typename RewardValueType, typename PomdpType, typename BeliefType>
 void RewardBoundedBeliefSplitter<RewardValueType, PomdpType, BeliefType>::unsetRewardModels() {
     actionRewardVectors.clear();
+    rewardVectorToIndex.clear();
 }
 
 template<typename RewardValueType, typename PomdpType, typename BeliefType>
