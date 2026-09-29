@@ -419,6 +419,8 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpM
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds) {
+    STORM_LOG_THROW(options.getTerminationCriterion() == NONE, storm::exceptions::NotSupportedException,
+                    "Belief discretization does not support exploration size or time limits.");
     auto mode = useDynamic ? FreudenthalTriangulationMode::Dynamic : FreudenthalTriangulationMode::Static;
     FreudenthalTriangulationBeliefAbstraction<Belief<BeliefValueType>> abstraction(storm::utility::convertNumber<BeliefValueType>(resolution), mode);
     return checkUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(env, inputPomdp, propertyInformation, options, valueBounds,
@@ -442,6 +444,8 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpM
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames) {
+    STORM_LOG_THROW(options.getTerminationCriterion() == NONE, storm::exceptions::NotSupportedException,
+                    "Belief discretization does not support exploration size or time limits.");
     validateRewardModelSelection(propertyInformation, relevantRewardModelNames);
     auto mode = useDynamic ? FreudenthalTriangulationMode::Dynamic : FreudenthalTriangulationMode::Static;
     FreudenthalTriangulationBeliefAbstraction<Belief<BeliefValueType>> abstraction(storm::utility::convertNumber<BeliefValueType>(resolution), mode);

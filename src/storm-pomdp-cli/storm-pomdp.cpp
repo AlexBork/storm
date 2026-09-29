@@ -424,13 +424,15 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     bool isUnderApproximation{false};
     bool completedExploration{false};
     if (pomdpSettings.isBeliefExplorationDiscretizeSet()) {
-        STORM_PRINT_AND_LOG("Computing an over-approximation via belief MDP discretization...\n");
         isOverApproximation = true;
-        if (belExplSettings.getSizeThresholdInit() == 0) {
-            revisedOptions.maxExplorationSize.reset();
-        } else {
-            revisedOptions.maxExplorationSize = belExplSettings.getSizeThresholdInit();
-        }
+        STORM_PRINT_AND_LOG("Computing an over-approximation via belief MDP discretization...\n");
+        STORM_LOG_WARN_COND(belExplSettings.getSizeThresholdInit() == 0,
+                            "The size threshold is ignored for discretization, which requires complete exploration.");
+        STORM_LOG_WARN_COND(belExplSettings.getExplorationTimeLimit() == 0,
+                            "The exploration time threshold is ignored for discretization, which requires complete exploration.");
+        revisedOptions.maxExplorationSize.reset();
+        revisedOptions.maxExplorationTime.reset();
+
         if (propertyInfo.kind == beliefs::PropertyInformation::Kind::RewardBoundedReachabilityProbability) {
             std::vector<std::string> relevantRewardModelNames;
             for (auto const& rewardBound : propertyInfo.rewardBounds) {
