@@ -55,6 +55,7 @@ std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model
     for (uint64_t formulaDim = 0; formulaDim < boundedUntilFormula.getDimension(); ++formulaDim) {
         int64_t const levelWidth = formulaDim < levelWidths.size() ? levelWidths[formulaDim] : 0;
         auto const& tbr = boundedUntilFormula.getTimeBoundReference(formulaDim);
+        STORM_LOG_THROW(tbr.isRewardBound(), storm::exceptions::NotSupportedException, "The bounded formula is not a reward-bounded formula.");
         STORM_LOG_THROW(
             !tbr.hasRewardAccumulation(), storm::exceptions::NotSupportedException,
             "The reward model for bound reference " << formulaDim << " has non-trivial reward accumulation which is not supported in this context.");

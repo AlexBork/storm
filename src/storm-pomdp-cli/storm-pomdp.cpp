@@ -65,7 +65,7 @@ bool performPreprocessing(std::shared_ptr<storm::models::sparse::Pomdp<ValueType
             STORM_PRINT_AND_LOG("Not eliminating self-loop choices as it does not preserve the formula.\n");
         }
     }
-    if (pomdpSettings.isQualitativeReductionSet() && formulaInfo.isNonNestedReachabilityProbability()) {
+    if (pomdpSettings.isQualitativeReductionSet() && formulaInfo.isNonNestedReachabilityProbability() && !formulaInfo.isBounded()) {
         storm::analysis::QualitativeAnalysisOnGraphs<ValueType> qualitativeAnalysis(*pomdp);
         STORM_PRINT_AND_LOG("Computing states with probability 0 ...");
         storm::storage::BitVector prob0States = qualitativeAnalysis.analyseProb0(formula.asProbabilityOperatorFormula());
@@ -169,7 +169,7 @@ void performQualitativeAnalysis(std::shared_ptr<storm::models::sparse::Pomdp<Val
     std::stringstream sstr;
     origpomdp->printModelInformationToStream(sstr);
     STORM_LOG_INFO(sstr.str());
-    STORM_LOG_THROW(formulaInfo.isNonNestedReachabilityProbability(), storm::exceptions::NotSupportedException,
+    STORM_LOG_THROW(formulaInfo.isNonNestedReachabilityProbability() && !formulaInfo.isBounded(), storm::exceptions::NotSupportedException,
                     "Qualitative memoryless scheduler search is not implemented for this property type.");
     STORM_LOG_TRACE("Run qualitative preprocessing...");
     storm::models::sparse::Pomdp<ValueType> pomdp(*origpomdp);
