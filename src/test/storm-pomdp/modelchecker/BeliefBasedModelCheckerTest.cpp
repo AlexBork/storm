@@ -4,6 +4,8 @@
 #include "storm-parsers/api/storm-parsers.h"
 #include "storm-pomdp/analysis/FormulaInformation.h"
 #include "storm-pomdp/analysis/QualitativeAnalysisOnGraphs.h"
+#include "storm-pomdp/beliefs/abstraction/RewardBoundedBeliefSplitter.h"
+#include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelChecker.h"
 #include "storm-pomdp/modelchecker/PreprocessingPomdpValueBoundsModelChecker.h"
 #include "storm-pomdp/transformer/GlobalPOMDPSelfLoopEliminator.h"
@@ -11,6 +13,8 @@
 #include "storm-pomdp/transformer/MakeStateSetObservationClosed.h"
 #include "storm/api/storm.h"
 #include "storm/environment/solver/MinMaxSolverEnvironment.h"
+#include "storm/exceptions/IllegalArgumentException.h"
+#include "storm/exceptions/NotSupportedException.h"
 #include "storm/transformer/MakePOMDPCanonic.h"
 #include "storm/utility/graph.h"
 
@@ -870,13 +874,76 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_min_max) {
     };
 
     // The goal is first reachable after three unit rewards; the scheduler chooses between success probabilities 0.3 and 0.7.
-    check("Pmax=? [ true Urew<=3 \"goal\" ]", "7/10");
-    check("Pmin=? [ true Urew<=3 \"goal\" ]", "3/10");
-    check("Pmax=? [ true Urew<=2 \"goal\" ]", "0");
-    check("Pmin=? [ true Urew<=2 \"goal\" ]", "0");
+    check("Pmax=? [ true Urew{\"rew\"}<=3 \"goal\" ]", "7/10");
+    check("Pmin=? [ true Urew{\"rew\"}<=3 \"goal\" ]", "3/10");
+    check("Pmax=? [ true Urew{\"rew\"}<=2 \"goal\" ]", "0");
+    check("Pmin=? [ true Urew{\"rew\"}<=2 \"goal\" ]", "0");
     // Target beliefs must remain explorable: their rewarded self-loop can satisfy a lower bound after the first visit.
-    check("Pmax=? [ true Urew>=4 \"goal\" ]", "7/10");
-    check("Pmin=? [ true Urew>=4 \"goal\" ]", "3/10");
+    check("Pmax=? [ true Urew{\"rew\"}>=4 \"goal\" ]", "7/10");
+    check("Pmin=? [ true Urew{\"rew\"}>=4 \"goal\" ]", "3/10");
+}
+
+TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_requires_explicit_reward_model_name) {
+    auto const programFile = STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism";
+    auto data = this->buildPrism(programFile, "Pmax=? [ true Urew{\"rew\"}<=3 \"goal\" ]", "slippery=0");
+    auto program = storm::api::parseProgram(programFile).preprocess("slippery=0");
+    auto unnamedFormula = storm::api::parsePropertiesForPrismProgram("Pmax=? [ true Urew<=3 \"goal\" ]", program).front().getRawFormula();
+
+    EXPECT_THROW(storm::pomdp::analysis::getFormulaInformation(*data.model, *unnamedFormula), storm::exceptions::NotSupportedException);
+
+    auto unnamedProperty = *data.propertyInfo;
+    unnamedProperty.rewardBounds.front().rewardModelName.clear();
+    storm::pomdp::beliefs::BeliefBasedModelChecker<storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType>, typename TestFixture::BeliefValueType,
+                                                   typename TestFixture::BeliefMDPValueType>
+        checker(*data.model);
+    storm::pomdp::storage::BeliefExplorationBounds<typename TestFixture::POMDPValueType> bounds;
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<typename TestFixture::BeliefMDPValueType> options;
+    EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), unnamedProperty, options, bounds, {"rew"}), storm::exceptions::NotSupportedException);
+}
+
+TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_requires_matching_reward_model_selection) {
+    using POMDPType = storm::models::sparse::Pomdp<typename TestFixture::POMDPValueType>;
+    using BeliefType = storm::pomdp::beliefs::Belief<typename TestFixture::BeliefValueType>;
+    using BeliefMDPValueType = typename TestFixture::BeliefMDPValueType;
+    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism", "Pmax=? [ true Urew{\"rew\"}<=3 \"goal\" ]", "slippery=0");
+    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, typename TestFixture::BeliefValueType, BeliefMDPValueType> checker(*data.model);
+    storm::pomdp::storage::BeliefExplorationBounds<typename TestFixture::POMDPValueType> bounds;
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
+
+    EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {}), storm::exceptions::IllegalArgumentException);
+    EXPECT_THROW(checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, bounds, {}),
+                 storm::exceptions::IllegalArgumentException);
+    EXPECT_THROW(checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {"other"}), storm::exceptions::IllegalArgumentException);
+    EXPECT_THROW(checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, bounds, {"other", "rew"}),
+                 storm::exceptions::IllegalArgumentException);
+
+    storm::pomdp::beliefs::RewardBoundedBeliefSplitter<BeliefMDPValueType, POMDPType, BeliefType> splitter(*data.model);
+    EXPECT_THROW(splitter.setRewardModels({}), storm::exceptions::IllegalArgumentException);
+}
+
+TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_allows_additional_observed_reward_model) {
+    using POMDPValueType = typename TestFixture::POMDPValueType;
+    using BeliefMDPValueType = typename TestFixture::BeliefMDPValueType;
+    using POMDPType = storm::models::sparse::Pomdp<POMDPValueType>;
+    auto data = this->buildPrism(STORM_TEST_RESOURCES_DIR "/pomdp/simple_unit_rewards.prism", "Pmax=? [ true Urew{\"rew\"}<=3 \"goal\" ]", "slippery=0");
+    auto extraRewardModel = data.model->getRewardModel("rew");
+    data.model->addRewardModel("extra", extraRewardModel);
+
+    storm::pomdp::storage::BeliefExplorationBounds<POMDPValueType> bounds;
+    bounds.preprocessingBounds.emplace();
+    bounds.preprocessingBounds->lower.emplace_back(data.model->getNumberOfStates(), storm::utility::zero<POMDPValueType>());
+    bounds.preprocessingBounds->upper.emplace_back(data.model->getNumberOfStates(), storm::utility::one<POMDPValueType>());
+    storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMDPValueType> options;
+    options.maxExplorationSize = data.model->getNumberOfStates() * data.model->getMaxNrStatesWithSameObservation();
+    storm::pomdp::beliefs::BeliefBasedModelChecker<POMDPType, typename TestFixture::BeliefValueType, BeliefMDPValueType> checker(*data.model);
+
+    auto const expected = this->template parseNumber<BeliefMDPValueType>("7/10");
+    for (bool const discretize : {false, true}) {
+        auto const result = discretize ? checker.checkRewardAwareDiscretize(this->env(), *data.propertyInfo, options, 10, false, bounds, {"rew", "extra"})
+                                       : checker.checkRewardAwareUnfold(this->env(), *data.propertyInfo, options, bounds, {"rew", "extra"});
+        EXPECT_TRUE(result.completedExploration);
+        EXPECT_LE(storm::utility::abs(result.value - expected), this->template modelcheckingPrecision<BeliefMDPValueType>());
+    }
 }
 
 TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_early_frontier_uses_cutoff) {
@@ -917,11 +984,11 @@ TYPED_TEST(BeliefBasedModelCheckerTest, reward_bounded_simple_early_frontier_use
     };
 
     // With only the initial belief explored, minimization uses the upper cut-off and maximization the lower cut-off.
-    check("Pmin=? [ true Urew<=3 \"goal\" ]", "1");
-    check("Pmax=? [ true Urew<=3 \"goal\" ]", "0");
+    check("Pmin=? [ true Urew{\"rew\"}<=3 \"goal\" ]", "1");
+    check("Pmax=? [ true Urew{\"rew\"}<=3 \"goal\" ]", "0");
     // The first transition still costs one reward: even the upper cut-off must fail a zero reward budget.
-    check("Pmin=? [ true Urew<=0 \"goal\" ]", "0");
-    check("Pmax=? [ true Urew<=0 \"goal\" ]", "0");
+    check("Pmin=? [ true Urew{\"rew\"}<=0 \"goal\" ]", "0");
+    check("Pmax=? [ true Urew{\"rew\"}<=0 \"goal\" ]", "0");
 }
 
 #if defined STORM_HAVE_LP_SOLVER

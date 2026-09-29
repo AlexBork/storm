@@ -26,7 +26,7 @@ class RewardBoundedBeliefSplitter {
     RewardBoundedBeliefSplitter(PomdpType const& pomdp);
     /** Selects one reward model; an empty name selects Storm's default reward model. */
     void setRewardModel(std::string const& rewardModelName = "");
-    /** Selects the reward models used to form reward vectors. */
+    /** Selects a nonempty list of reward models used to form reward vectors. */
     void setRewardModels(std::vector<std::string> const& rewardModelNames);
     /** Clears the selected reward models and all generated reward-vector observation indices. */
     void unsetRewardModels();

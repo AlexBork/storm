@@ -325,6 +325,9 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     stateLabeling.addLabel("target");
     if (isRewBndReachProb) {
         stateLabeling.addLabelToState("target", targetState);
+        // A belief observation may encode an action observation as actionObservation * nrObservationsInPomdp + pomdpObservation.
+        // The modulo recovers the current POMDP observation ID, which is also the ID stored in targetObservations.
+        // After reward-aware transformation, that ID identifies a (target observation, reward vector) pair.
         for (auto const& [belId, state] : explorationInformation.exploredBeliefs) {
             if (propertyInformation.targetObservations.contains(explorationInformation.discoveredBeliefs.getBeliefFromId(belId).observation() %
                                                                 explorationInformation.nrObservationsInPomdp)) {

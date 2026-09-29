@@ -8,6 +8,8 @@
 #include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm-pomdp/beliefs/verification/BeliefBasedModelCheckerOptions.h"
 #include "storm/api/verification.h"
+#include "storm/exceptions/IllegalArgumentException.h"
+#include "storm/exceptions/NotSupportedException.h"
 #include "storm/modelchecker/results/ExplicitQuantitativeCheckResult.h"
 #include "storm/models/sparse/Pomdp.h"
 #include "storm/transformer/GoalStateMerger.h"
@@ -21,6 +23,23 @@
 #include <sstream>
 
 namespace storm::pomdp::beliefs {
+
+void validateRewardModelSelection(PropertyInformation const& propertyInformation, std::vector<std::string> const& rewardModelNames) {
+    STORM_LOG_THROW(!rewardModelNames.empty(), storm::exceptions::IllegalArgumentException,
+                    "Reward-aware belief exploration requires at least one selected reward model.");
+    for (auto const& rewardBound : propertyInformation.rewardBounds) {
+        // TODO: we can lift this if the handling of empty reward models is made consistent in storm-main
+        STORM_LOG_THROW(!rewardBound.rewardModelName.empty(), storm::exceptions::NotSupportedException,
+                        "For POMDPs, reward-bounded formulae must explicitly name a reward model for each bound.");
+    }
+    STORM_LOG_THROW(rewardModelNames.size() >= propertyInformation.rewardBounds.size(), storm::exceptions::IllegalArgumentException,
+                    "The selected reward models must include all reward-bounded dimensions first.");
+    for (std::size_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
+        STORM_LOG_THROW(
+            rewardModelNames[i] == propertyInformation.rewardBounds[i].rewardModelName, storm::exceptions::IllegalArgumentException,
+            "Selected reward model " << i << " must match the corresponding reward bound '" << propertyInformation.rewardBounds[i].rewardModelName << "'.");
+    }
+}
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
 BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::BeliefBasedModelChecker(PomdpModelType const& pomdp) : inputPomdp(pomdp) {
@@ -411,12 +430,9 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpM
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames) {
+    validateRewardModelSelection(propertyInformation, relevantRewardModelNames);
     RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpModelType, Belief<BeliefValueType>> rewardBoundedBeliefSplitter(inputPomdp);
-    if (relevantRewardModelNames.empty()) {
-        rewardBoundedBeliefSplitter.setRewardModel();
-    } else {
-        rewardBoundedBeliefSplitter.setRewardModels(relevantRewardModelNames);
-    }
+    rewardBoundedBeliefSplitter.setRewardModels(relevantRewardModelNames);
     return checkRewardAwareUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(env, inputPomdp, propertyInformation, options,
                                                                                                            valueBounds, rewardBoundedBeliefSplitter);
 }
@@ -426,14 +442,11 @@ BeliefBasedModelCheckerResult<BeliefMdpValueType> BeliefBasedModelChecker<PomdpM
     storm::Environment const& env, PropertyInformation const& propertyInformation,
     storm::pomdp::beliefs::BeliefBasedModelCheckerOptions<BeliefMdpValueType> const& options, uint64_t resolution, bool useDynamic,
     storage::BeliefExplorationBounds<typename PomdpModelType::ValueType> const& valueBounds, std::vector<std::string> const& relevantRewardModelNames) {
+    validateRewardModelSelection(propertyInformation, relevantRewardModelNames);
     auto mode = useDynamic ? FreudenthalTriangulationMode::Dynamic : FreudenthalTriangulationMode::Static;
     FreudenthalTriangulationBeliefAbstraction<Belief<BeliefValueType>> abstraction(storm::utility::convertNumber<BeliefValueType>(resolution), mode);
     RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpModelType, Belief<BeliefValueType>> rewardBoundedBeliefSplitter(inputPomdp);
-    if (relevantRewardModelNames.empty()) {
-        rewardBoundedBeliefSplitter.setRewardModel();
-    } else {
-        rewardBoundedBeliefSplitter.setRewardModels(relevantRewardModelNames);
-    }
+    rewardBoundedBeliefSplitter.setRewardModels(relevantRewardModelNames);
     return checkRewardAwareUnfoldOrDiscretize<PomdpModelType, Belief<BeliefValueType>, BeliefMdpValueType>(
         env, inputPomdp, propertyInformation, options, valueBounds, rewardBoundedBeliefSplitter, abstraction);
 }

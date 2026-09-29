@@ -14,7 +14,7 @@ module main
     [alpha] s=5 | s=6 -> 1: true;
 endmodule
 
-rewards
+rewards "rew"
     [alpha] true : 1;
     [beta] true : 1;
 endrewards

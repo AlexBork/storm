@@ -159,9 +159,12 @@ FormulaInformation getFormulaInformation(PomdpType const& pomdp, storm::logic::P
         constraintsStatesFormula = boundedUntilFormula.getLeftSubformula().asSharedPointer();
         bounded = true;
         for (uint64_t i = 0; i < boundedUntilFormula.getDimension(); ++i) {
-            STORM_LOG_THROW(boundedUntilFormula.getTimeBoundReference(i).isRewardBound(), storm::exceptions::NotSupportedException,
-                            "For POMDPs, Storm currently does not support bounds other than reward bounds for bounded formulae.");
-            rewardBoundReferences.push_back(boundedUntilFormula.getTimeBoundReference(i));
+            auto const& boundReference = boundedUntilFormula.getTimeBoundReference(i);
+            STORM_LOG_THROW(boundReference.isRewardBound() && !boundReference.hasRewardAccumulation(), storm::exceptions::NotSupportedException,
+                            "For POMDPs, only plain reward bounds are supported.");
+            STORM_LOG_THROW(boundReference.hasRewardModelName(), storm::exceptions::NotSupportedException,
+                            "For POMDPs, reward-bounded formulae must explicitly name a reward model for each bound.");
+            rewardBoundReferences.push_back(boundReference);
         }
     }
     if (targetStatesFormula && targetStatesFormula->isInFragment(storm::logic::propositional()) && constraintsStatesFormula &&
