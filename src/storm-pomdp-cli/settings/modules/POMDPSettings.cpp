@@ -65,8 +65,7 @@ POMDPSettings::POMDPSettings() : ModuleSettings(moduleName) {
     this->addOption(
         storm::settings::OptionBuilder(moduleName, checkFullyObservableOption, false, "Performs standard model checking on the underlying MDP").build());
     this->addOption(storm::settings::OptionBuilder(moduleName, isQualitativeOption, false, "Sets the option qualitative analysis").build());
-    this->addOption(storm::settings::OptionBuilder(
-                        moduleName, isBoundedToUnboundedReachabilityTransformationOption, false,
+    this->addOption(storm::settings::OptionBuilder(moduleName, isBoundedToUnboundedReachabilityTransformationOption, false,
                                                    "Transforms reward-bounded reachability properties to an unbounded problem on an unfolded POMDP.")
                         .build());
     this->addOption(storm::settings::OptionBuilder(moduleName, isRewardObservableOption, false, "Makes rewards observable for bounded reachability properties.")
