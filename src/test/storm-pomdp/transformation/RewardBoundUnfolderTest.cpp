@@ -1,6 +1,7 @@
 #include "storm-config.h"
 #include "test/storm_gtest.h"
 
+#include <limits>
 #include <memory>
 #include <optional>
 #include <set>
@@ -15,6 +16,7 @@
 #include "storm-pomdp/transformer/ToStateBasedObservationTransformer.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/api/storm.h"
+#include "storm/exceptions/InvalidArgumentException.h"
 #include "storm/exceptions/NotSupportedException.h"
 #include "storm/logic/AtomicLabelFormula.h"
 #include "storm/logic/BooleanLiteralFormula.h"
@@ -196,6 +198,26 @@ TEST(RewardBoundUnfolder, LevelAbstractionPreservesPomdpSpecificComponents) {
     EXPECT_TRUE(unfoldedPomdp->hasRewardModel("r"));
     EXPECT_TRUE(unfoldedPomdp->hasRewardModel("dim0_levelReward"));
     EXPECT_TRUE(result.formula->asProbabilityOperatorFormula().getSubformula().isBoundedUntilFormula());
+}
+
+TEST(RewardBoundUnfolder, RejectsLevelWidthOutsideSignedRange) {
+    auto const pomdp = buildPomdp();
+    auto const formula = makeRewardBoundedFormula(std::nullopt, 1);
+    storm::pomdp::transformer::RewardBoundUnfolder<ValueType>::UnfoldingOptions options;
+    options.levelWidths = {static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) + 1};
+
+    STORM_SILENT_EXPECT_THROW(storm::pomdp::transformer::RewardBoundUnfolder<ValueType>::transform(*pomdp, *formula, options),
+                              storm::exceptions::InvalidArgumentException);
+}
+
+TEST(RewardBoundUnfolder, AcceptsLargestSignedLevelWidth) {
+    auto const dtmc = buildDtmc();
+    auto const formula = makeRewardBoundedFormula(std::nullopt, 1);
+    storm::pomdp::transformer::RewardBoundUnfolder<ValueType>::UnfoldingOptions options;
+    options.levelWidths = {static_cast<uint64_t>(std::numeric_limits<int64_t>::max())};
+
+    auto const result = storm::pomdp::transformer::RewardBoundUnfolder<ValueType>::transform(*dtmc, *formula, options);
+    EXPECT_EQ(getInitialValue(dtmc, formula), getInitialValue(result.model, result.formula));
 }
 
 TEST(RewardBoundUnfolder, TrivialLowerBoundCanBeFollowedByRewardAwareObservationTransformation) {

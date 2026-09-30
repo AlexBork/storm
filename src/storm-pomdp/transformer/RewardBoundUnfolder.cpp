@@ -1,5 +1,6 @@
 #include "storm-pomdp/transformer/RewardBoundUnfolder.h"
 
+#include <limits>
 #include <queue>
 
 #include "storm/adapters/RationalNumberAdapter.h"
@@ -16,6 +17,7 @@
 #include "storm/utility/builder.h"
 #include "storm/utility/macros.h"
 
+#include "storm/exceptions/InvalidArgumentException.h"
 #include "storm/exceptions/InvalidPropertyException.h"
 #include "storm/exceptions/NotSupportedException.h"
 
@@ -55,7 +57,9 @@ std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model
                     "Only propositional left subformulas are supported.");  // Temporal sub-formulas are potentially not preserved by the construction
     std::vector<Dimension<ValueType>> dimensions;
     for (uint64_t formulaDim = 0; formulaDim < boundedUntilFormula.getDimension(); ++formulaDim) {
-        int64_t const levelWidth = formulaDim < levelWidths.size() ? levelWidths[formulaDim] : 0;
+        STORM_LOG_THROW(formulaDim >= levelWidths.size() || levelWidths[formulaDim] <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()),
+                        storm::exceptions::InvalidArgumentException, "Level width in dimension " << formulaDim << " exceeds INT64_MAX.");
+        int64_t const levelWidth = formulaDim < levelWidths.size() ? static_cast<int64_t>(levelWidths[formulaDim]) : 0;
         auto const& tbr = boundedUntilFormula.getTimeBoundReference(formulaDim);
         STORM_LOG_THROW(tbr.isRewardBound(), storm::exceptions::NotSupportedException, "The bounded formula is not a reward-bounded formula.");
         STORM_LOG_THROW(
@@ -121,7 +125,8 @@ std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model
  * @note operator% is not the modulos for negative numerators. E.g. -1 % 3 = -1, but mod(-1, 3) = 2
  */
 int64_t mod(int64_t a, int64_t b) {
-    return (a % b + b) % b;
+    int64_t const remainder = a % b;
+    return remainder < 0 ? remainder + b : remainder;
 }
 
 template<typename ValueType>
