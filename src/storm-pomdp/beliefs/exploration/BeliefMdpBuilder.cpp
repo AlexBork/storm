@@ -1,5 +1,7 @@
 #include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
 
+#include <unordered_map>
+
 #include "storm-pomdp/beliefs/storage/Belief.h"
 
 #include "storm/adapters/RationalNumberAdapter.h"
@@ -64,6 +66,26 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
         }
     }
     STORM_LOG_THROW(false, storm::exceptions::UnexpectedException, "Unhandled case.");
+}
+
+template<typename MatrixType>
+bool hasUniqueTransitionRewardsInChoice(MatrixType const& matrix, uint64_t choice, uint64_t numRewardModels) {
+    std::unordered_map<BeliefId, bool> targetHasReward;
+    for (auto i = matrix.rowIndications[choice]; i < matrix.rowIndications[choice + 1]; ++i) {
+        auto const& entry = matrix.transitions[i];
+        bool hasReward = false;
+        for (uint64_t rewardIndex = 0; rewardIndex < numRewardModels; ++rewardIndex) {
+            if (!storm::utility::isZero(entry.data[rewardIndex])) {
+                hasReward = true;
+                break;
+            }
+        }
+        auto [it, inserted] = targetHasReward.emplace(entry.targetBelief, hasReward);
+        if (!inserted && (hasReward || it->second)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
@@ -153,6 +175,11 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
             transitionRewardBuilder.newRowGroup(choice);
         }
         for (uint64_t const groupEnd = explorationInformation.matrix.rowGroupIndices[state + 1]; choice < groupEnd; ++choice) {
+            if constexpr (extraDataCompatibleWithRewardAwareness) {
+                STORM_LOG_ASSERT(
+                    !isRewBndReachProb || hasUniqueTransitionRewardsInChoice(explorationInformation.matrix, choice, propertyInformation.rewardBounds.size()),
+                    "Duplicate transition reward in choice " << choice << ".");
+            }
             auto probabilityToBottom = storm::utility::zero<BeliefMdpValueType>();
             auto probabilityToTarget = storm::utility::zero<BeliefMdpValueType>();
             for (uint64_t entryIndex = explorationInformation.matrix.rowIndications[choice];
