@@ -47,6 +47,8 @@ struct Dimension {
 template<typename ValueType>
 std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model<ValueType> const& model,
                                                     storm::logic::BoundedUntilFormula const& boundedUntilFormula, std::vector<uint64_t> const& levelWidths) {
+    STORM_LOG_THROW(!boundedUntilFormula.hasMultiDimensionalSubformulas(), storm::exceptions::NotSupportedException,
+                    "Reward bound unfolding requires shared left and right state subformulas across all dimensions.");
     STORM_LOG_THROW(boundedUntilFormula.getRightSubformula().isInFragment(storm::logic::propositional()), storm::exceptions::NotSupportedException,
                     "Only propositional right subformulas are supported.");  // Temporal sub-formulas are potentially not preserved by the construction
     STORM_LOG_THROW(boundedUntilFormula.getLeftSubformula().isInFragment(storm::logic::propositional()), storm::exceptions::NotSupportedException,

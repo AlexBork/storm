@@ -10,10 +10,12 @@
 
 #include <boost/optional.hpp>
 
+#include "storm-pomdp/analysis/FormulaInformation.h"
 #include "storm-pomdp/transformer/RewardBoundUnfolder.h"
 #include "storm-pomdp/transformer/ToStateBasedObservationTransformer.h"
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/api/storm.h"
+#include "storm/exceptions/NotSupportedException.h"
 #include "storm/logic/AtomicLabelFormula.h"
 #include "storm/logic/BooleanLiteralFormula.h"
 #include "storm/logic/BoundedUntilFormula.h"
@@ -252,4 +254,23 @@ TEST(RewardBoundUnfolder, DropsTriviallySatisfiedLowerBoundForDtmc) {
 
     EXPECT_TRUE(result.formula->asProbabilityOperatorFormula().getSubformula().isUntilFormula());
     EXPECT_EQ(expectedValue, getInitialValue(result.model, result.formula));
+}
+
+TEST(RewardBoundUnfolder, RejectsDimensionSpecificStateSubformulas) {
+    auto const pomdp = buildPomdp();
+    auto const expressionManager = std::make_shared<storm::expressions::ExpressionManager>();
+    auto const trueFormula = std::make_shared<storm::logic::BooleanLiteralFormula>(true);
+    std::vector<std::shared_ptr<storm::logic::Formula const>> leftSubformulas{trueFormula, trueFormula};
+    std::vector<std::shared_ptr<storm::logic::Formula const>> rightSubformulas{std::make_shared<storm::logic::AtomicLabelFormula>("goal"),
+                                                                               std::make_shared<storm::logic::AtomicLabelFormula>("init")};
+    std::vector<std::optional<storm::logic::TimeBound>> lowerBounds(2);
+    std::vector<std::optional<storm::logic::TimeBound>> upperBounds{storm::logic::TimeBound{false, expressionManager->integer(1)},
+                                                                    storm::logic::TimeBound{false, expressionManager->integer(2)}};
+    std::vector<storm::logic::TimeBoundReference> references(2, storm::logic::TimeBoundReference(boost::optional<std::string>{"r"}));
+    auto const pathFormula = std::make_shared<storm::logic::BoundedUntilFormula>(leftSubformulas, rightSubformulas, lowerBounds, upperBounds, references);
+    auto const formula = std::make_shared<storm::logic::ProbabilityOperatorFormula>(
+        pathFormula, storm::logic::OperatorInformation(boost::optional<storm::solver::OptimizationDirection>{storm::solver::OptimizationDirection::Maximize}));
+
+    STORM_SILENT_EXPECT_THROW(storm::pomdp::analysis::getFormulaInformation(*pomdp, *formula), storm::exceptions::NotSupportedException);
+    STORM_SILENT_EXPECT_THROW(storm::pomdp::transformer::RewardBoundUnfolder<ValueType>::transform(*pomdp, *formula), storm::exceptions::NotSupportedException);
 }
