@@ -63,7 +63,7 @@ BeliefId BeliefCollector<BeliefType>::addBelief(BeliefType&& inputBelief) {
     auto const& belief = gatheredBeliefs.back();
     auto const& obs = belief.observation();
     if (obs >= beliefToIdMap.size()) {
-        beliefToIdMap.resize(obs + 1);
+        beliefToIdMap.resize(static_cast<uint64_t>(obs) + 1);
     }
     beliefToIdMap[obs].emplace(belief, id);
     return id;

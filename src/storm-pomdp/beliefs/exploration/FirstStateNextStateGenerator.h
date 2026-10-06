@@ -169,8 +169,9 @@ struct NextStateGeneratorHandle {
             for (auto const& pomdpTransition : pomdp.getTransitionMatrix().getRow(state, localActionIndex)) {
                 if (!storm::utility::isZero(pomdpTransition.getValue())) {
                     auto const obs = (pomdp.getNrObservations() * actionObservation) + pomdp.getObservation(pomdpTransition.getColumn());
+                    STORM_LOG_ASSERT(obs < InvalidObservation, "Encoded belief observation " << obs << " exceeds the valid observation range.");
                     BeliefValueType const val = beliefValue * storm::utility::convertNumber<BeliefValueType>(pomdpTransition.getValue());
-                    if (auto [insertionIt, inserted] = successorObservations.emplace(obs, val); !inserted) {
+                    if (auto [insertionIt, inserted] = successorObservations.emplace(static_cast<BeliefObservationType>(obs), val); !inserted) {
                         insertionIt->second += val;
                     }
                 }
