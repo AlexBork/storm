@@ -197,7 +197,8 @@ struct NextStateGeneratorHandle {
             builder.setObservation(successorObsValue.first);
             belief.forEach([&builder, &localActionIndex, &successorObsValue, this](BeliefStateType const& state, BeliefValueType const& beliefValue) {
                 for (auto const& pomdpTransition : pomdp.getTransitionMatrix().getRow(state, localActionIndex)) {
-                    if (pomdp.getObservation(pomdpTransition.getColumn()) == (successorObsValue.first % pomdp.getNrObservations())) {
+                    if (!storm::utility::isZero(pomdpTransition.getValue()) &&
+                        pomdp.getObservation(pomdpTransition.getColumn()) == (successorObsValue.first % pomdp.getNrObservations())) {
                         BeliefValueType const prob =
                             beliefValue * storm::utility::convertNumber<BeliefValueType>(pomdpTransition.getValue()) / successorObsValue.second;
                         STORM_LOG_ASSERT(prob > storm::utility::zero<BeliefValueType>(), "Invalid belief probability " << prob << ".");
