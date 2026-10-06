@@ -305,8 +305,13 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
         std::unordered_map<std::string, BeliefMdpValueType> cutOffInformationForBelief = cutOffInformationMap.at(stateToFrontierBeliefMap.at(state));
         for (auto const& entry : cutOffInformationForBelief) {
             if (isReachProb || isRewBndReachProb) {
-                transitionBuilder.addNextValue(choice, targetState, entry.second);
-                transitionBuilder.addNextValue(choice, bottomState, storm::utility::one<BeliefMdpValueType>() - entry.second);
+                if (!storm::utility::isZero(entry.second)) {
+                    transitionBuilder.addNextValue(choice, targetState, entry.second);
+                }
+                BeliefMdpValueType const probabilityToBottom = storm::utility::one<BeliefMdpValueType>() - entry.second;
+                if (!storm::utility::isZero(probabilityToBottom)) {
+                    transitionBuilder.addNextValue(choice, bottomState, probabilityToBottom);
+                }
             } else {
                 transitionBuilder.addNextValue(choice, targetState, storm::utility::one<BeliefMdpValueType>());
                 if (isTotRew) {
