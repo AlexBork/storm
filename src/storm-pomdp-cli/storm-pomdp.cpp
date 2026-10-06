@@ -368,7 +368,6 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
         }
     } else {
         // We only consider bounded probability formulae, so we can use 0-1 bounds
-        // TODO make smarter pre-computed value bounds
         storm::pomdp::storage::PreprocessingPomdpValueBounds<ValueType> zeroOneValueBound;
         zeroOneValueBound.lower.push_back(std::vector<ValueType>(preprocessedPomdpPtr->getNumberOfStates(), storm::utility::zero<ValueType>()));
         zeroOneValueBound.upper.push_back(std::vector<ValueType>(preprocessedPomdpPtr->getNumberOfStates(), storm::utility::one<ValueType>()));
