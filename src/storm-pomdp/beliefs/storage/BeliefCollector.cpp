@@ -1,6 +1,7 @@
 #include "storm-pomdp/beliefs/storage/BeliefCollector.h"
 #include "storm-pomdp/beliefs/storage/Belief.h"
 #include "storm/adapters/RationalNumberAdapter.h"
+#include "storm/exceptions/OutOfRangeException.h"
 
 namespace storm::pomdp::beliefs {
 
@@ -24,13 +25,14 @@ template<typename BeliefType>
 BeliefId BeliefCollector<BeliefType>::getIdFromBelief(BeliefType const& belief) const {
     STORM_LOG_ASSERT(belief.observation() < beliefToIdMap.size(),
                      "Unknown belief observation " << belief.observation() << ". Observations are in [0," << beliefToIdMap.size());
-    STORM_LOG_ASSERT(containsBelief(belief), "Belief " << belief.toString() << " is not present in this collector.");
-    return beliefToIdMap[belief.observation()].at(belief);
+    auto const id = getIdOptional(belief);
+    STORM_LOG_THROW(id != InvalidBeliefId, storm::exceptions::OutOfRangeException, "Belief " << belief.toString() << " is not present in this collector.");
+    return id;
 }
 
 template<typename BeliefType>
 bool BeliefCollector<BeliefType>::containsBelief(BeliefType const& belief) const {
-    return belief.observation() < beliefToIdMap.size() && beliefToIdMap[belief.observation()].count(belief) > 0;
+    return getIdOptional(belief) != InvalidBeliefId;
 }
 
 template<typename BeliefType>
@@ -40,9 +42,12 @@ bool BeliefCollector<BeliefType>::containsId(BeliefId const& id) const {
 
 template<typename BeliefType>
 BeliefId BeliefCollector<BeliefType>::getIdOptional(BeliefType const& belief) const {
-    if (auto const& obs = belief.observation(); obs < beliefToIdMap.size()) {
-        if (auto findRes = beliefToIdMap[obs].find(belief); findRes != beliefToIdMap[obs].end()) {
-            return findRes->second;
+    if (auto const obs = belief.observation(); obs < beliefToIdMap.size()) {
+        auto const [begin, end] = beliefToIdMap[obs].equal_range(typename BeliefType::BeliefHash{}(belief));
+        for (auto it = begin; it != end; ++it) {
+            if (gatheredBeliefs[it->second] == belief) {
+                return it->second;
+            }
         }
     }
     return InvalidBeliefId;
@@ -58,14 +63,14 @@ BeliefId BeliefCollector<BeliefType>::getIdOrAddBelief(BeliefType&& belief) {
 
 template<typename BeliefType>
 BeliefId BeliefCollector<BeliefType>::addBelief(BeliefType&& inputBelief) {
-    auto const id = gatheredBeliefs.size();
-    gatheredBeliefs.push_back(std::move(inputBelief));
-    auto const& belief = gatheredBeliefs.back();
-    auto const& obs = belief.observation();
+    auto const obs = inputBelief.observation();
+    auto const hash = typename BeliefType::BeliefHash{}(inputBelief);
     if (obs >= beliefToIdMap.size()) {
         beliefToIdMap.resize(static_cast<uint64_t>(obs) + 1);
     }
-    beliefToIdMap[obs].emplace(belief, id);
+    auto const id = gatheredBeliefs.size();
+    gatheredBeliefs.push_back(std::move(inputBelief));
+    beliefToIdMap[obs].emplace(hash, id);
     return id;
 }
 
