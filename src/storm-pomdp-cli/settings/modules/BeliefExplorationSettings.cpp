@@ -58,7 +58,8 @@ BeliefExplorationSettings::BeliefExplorationSettings() : ModuleSettings(moduleNa
             .build());
     this->addOption(
         storm::settings::OptionBuilder(moduleName, cutZeroGapOption, false, "Cut beliefs where the gap between over- and underapproximation is 0.").build());
-    this->addOption(storm::settings::OptionBuilder(moduleName, inexactPreprocessingOption, false,
+    this->addOption(storm::settings::OptionBuilder(
+                        moduleName, inexactPreprocessingOption, false,
                         "If this is set, the POMDP will be analysed using floating point arithmetic for preprocessing, even in exact mode. This speeds "
                         "up computations, but can lead to inaccurate results.")
                         .build());
