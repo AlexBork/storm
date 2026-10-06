@@ -145,11 +145,12 @@ class BeliefExploration {
 
     /**
      * Continues reward-aware exploration, splitting a belief by reward vector before generating successors.
+     * Reuse the same reward splitter across resumptions to preserve reward-vector observation indices.
      */
     template<typename AbstractionType>
     void resumeRewardAwareExploration(RewardAwareExplorationInformation<BeliefMdpValueType, BeliefType>& info,
                                       TerminalBeliefCallback const& terminalBeliefCallback, TerminationCallback const& terminationCallback,
-                                      RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpType, BeliefType> rewardSplitter,
+                                      RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpType, BeliefType>& rewardSplitter,
                                       storm::OptionalRef<AbstractionType> abstraction) {
         RewardAwareDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
         if (abstraction) {
