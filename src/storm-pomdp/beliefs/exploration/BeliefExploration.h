@@ -133,6 +133,8 @@ class BeliefExploration {
                            storm::OptionalRef<AbstractionType> abstraction) {
         if (rewardModelName.has_value()) {
             firstStateNextStateGenerator.setRewardModel(rewardModelName.value());
+        } else {
+            firstStateNextStateGenerator.unsetRewardModel();
         }
         StandardDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
         if (abstraction) {
@@ -152,6 +154,7 @@ class BeliefExploration {
                                       TerminalBeliefCallback const& terminalBeliefCallback, TerminationCallback const& terminationCallback,
                                       RewardBoundedBeliefSplitter<BeliefMdpValueType, PomdpType, BeliefType>& rewardSplitter,
                                       storm::OptionalRef<AbstractionType> abstraction) {
+        firstStateNextStateGenerator.unsetRewardModel();
         RewardAwareDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
         if (abstraction) {
             performExploration(info, firstStateNextStateGenerator.getPrePostAbstractionHandle(rewardSplitter, abstraction.value(), discoverCallback),
@@ -171,6 +174,8 @@ class BeliefExploration {
                                    storm::OptionalRef<AbstractionType> abstraction) {
         if (rewardModelName.has_value()) {
             firstStateNextStateGenerator.setRewardModel(rewardModelName.value());
+        } else {
+            firstStateNextStateGenerator.unsetRewardModel();
         }
         ClippingDiscoverCallback<BeliefMdpValueType, PomdpType, BeliefType> discoverCallback(info);
         if (abstraction) {
