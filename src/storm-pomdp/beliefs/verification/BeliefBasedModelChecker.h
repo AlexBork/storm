@@ -21,7 +21,10 @@ template<typename PomdpModelType, typename BeliefValueType = typename PomdpModel
 class BeliefBasedModelChecker {
    public:
     using PomdpValueType = typename PomdpModelType::ValueType;
-    /** Creates a checker for a canonic POMDP. The POMDP must outlive the checker. */
+    /**
+     * Creates a checker for a canonic POMDP. The POMDP must outlive the checker.
+     * @throws storm::exceptions::IllegalArgumentException if the POMDP is not known to be canonic.
+     */
     explicit BeliefBasedModelChecker(PomdpModelType const& pomdp);
 
     /**

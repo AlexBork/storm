@@ -47,7 +47,7 @@ void validateRewardModelSelection(PropertyInformation const& propertyInformation
 
 template<typename PomdpModelType, typename BeliefValueType, typename BeliefMdpValueType>
 BeliefBasedModelChecker<PomdpModelType, BeliefValueType, BeliefMdpValueType>::BeliefBasedModelChecker(PomdpModelType const& pomdp) : inputPomdp(pomdp) {
-    STORM_LOG_ERROR_COND(inputPomdp.isCanonic(), "Input Pomdp is not known to be canonic. This might lead to unexpected verification results.");
+    STORM_LOG_THROW(inputPomdp.isCanonic(), storm::exceptions::IllegalArgumentException, "Belief-based model checking requires a canonic POMDP.");
 }
 
 /** Creates the callback that ends exploration and turns the queued beliefs into the frontier. */
