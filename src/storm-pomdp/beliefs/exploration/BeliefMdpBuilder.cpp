@@ -101,6 +101,18 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     bool constexpr extraDataCompatibleWithRewardAwareness =
         sizeof...(ExtraTransitionData) == 1 && (std::is_same_v<std::vector<BeliefMdpValueType>, ExtraTransitionData> || ...);
 
+    // A rewarding cut-off loop may leave a two-sided interval before all dimensions satisfy their bounds.
+    // TODO: Support two-sided Pmin bounds by splitting each such dimension into lower-only and upper-only copies with distinct
+    // internal reward-model names. Keep identical original rewards in both copies on ordinary transitions. On the successful
+    // cut-off transition to the target, add enough reward only to lower-bound copies to satisfy all lower bounds immediately
+    // (including strict ones), and zero reward to upper-bound copies. This is an optimistic continuation: upper-bound violations
+    // incurred before the cut-off still fail. Splitting the formula bounds alone is insufficient because the copies need
+    // different cut-off rewards.
+    STORM_LOG_THROW(!(isRewBndReachProb && propertyInformation.dir == storm::OptimizationDirection::Minimize &&
+                      std::any_of(propertyInformation.rewardBounds.begin(), propertyInformation.rewardBounds.end(),
+                                  [](RewardBound const& bound) { return bound.lowerBound.has_value() && bound.upperBound.has_value(); })),
+                    storm::exceptions::NotSupportedException,
+                    "Reward-bounded probability minimisation does not support dimensions with both lower and upper reward bounds.");
     auto const frontierBeliefs = explorationInformation.getFrontierBeliefs();
     bool const initialBeliefIsTerminal = explorationInformation.terminalBeliefValues.contains(explorationInformation.initialBeliefId);
 
@@ -331,8 +343,13 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
         optionalChoiceLabeling.value().addLabelToChoice("__loop__", numChoices - numBottomTargetStates);
     }
     transitionBuilder.addNextValue(numChoices - numBottomTargetStates, targetState, storm::utility::one<BeliefMdpValueType>());
-    for (auto& transitionRewardBuilder : transitionRewardBuilderVector) {
+    for (uint64_t i = 0; i < transitionRewardBuilderVector.size(); ++i) {
+        auto& transitionRewardBuilder = transitionRewardBuilderVector[i];
         transitionRewardBuilder.newRowGroup(numChoices - numBottomTargetStates);
+        // Optimistic Pmin cut-offs must eventually satisfy every lower bound without consuming upper-only budgets.
+        if (propertyInformation.dir == storm::OptimizationDirection::Minimize && propertyInformation.rewardBounds[i].lowerBound.has_value()) {
+            transitionRewardBuilder.addNextValue(numChoices - numBottomTargetStates, targetState, storm::utility::one<BeliefMdpValueType>());
+        }
     }
     if (isReachProb || isRewBndReachProb || clippingUsed) {
         transitionBuilder.newRowGroup(numChoices - 1);

@@ -31,6 +31,10 @@ void validateRewardModelSelection(PropertyInformation const& propertyInformation
         // TODO: we can lift this if the handling of empty reward models is made consistent in storm-main
         STORM_LOG_THROW(!rewardBound.rewardModelName.empty(), storm::exceptions::NotSupportedException,
                         "For POMDPs, reward-bounded formulae must explicitly name a reward model for each bound.");
+        STORM_LOG_THROW(
+            !(propertyInformation.dir == storm::OptimizationDirection::Minimize && rewardBound.lowerBound.has_value() && rewardBound.upperBound.has_value()),
+            storm::exceptions::NotSupportedException,
+            "Reward-bounded probability minimisation does not support dimensions with both lower and upper reward bounds.");
     }
     STORM_LOG_THROW(rewardModelNames.size() >= propertyInformation.rewardBounds.size(), storm::exceptions::IllegalArgumentException,
                     "The selected reward models must include all reward-bounded dimensions first.");

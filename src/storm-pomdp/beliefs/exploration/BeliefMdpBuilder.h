@@ -19,6 +19,9 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
  * The reward-aware belief exploration does not classify beliefs as terminal. A target observation alone does not decide whether the accumulated
  * rewards satisfy the bound, in particular when there are lower bounds. Such beliefs therefore remain explored or frontier states;
  * their transition reward vectors are retained on their ordinary edges.
+ * For reward-bounded minimisation, the cut-off target earns one reward per self-loop in each lower-bounded dimension and zero in upper-only
+ * dimensions, providing an optimistic continuation. Dimensions with both lower and upper reward bounds are not supported for minimisation,
+ * even when exploration completes.
  *
  * @tparam BeliefMdpValueType ValueType of the belief MDP
  * @tparam BeliefType Type of the belief
@@ -27,6 +30,7 @@ std::shared_ptr<storm::logic::Formula const> createFormulaForBeliefMdp(PropertyI
  * @param propertyInformation object containing information about the property to verify
  * @param computeCutOffValueMap function to compute all cut-off values for a belief given the provided information. A separate cut-off action is added for each
  * value, allowing the model checker to choose the best one. This choice can later be retraced.
+ * @throws storm::exceptions::NotSupportedException if reward-bounded minimisation has a dimension with both lower and upper reward bounds
  * @return the belief MDP and a mapping from represented belief states to their belief IDs; synthetic target and bottom sinks
  * are omitted from the mapping */
 template<typename BeliefMdpValueType, typename BeliefType, typename... ExtraTransitionData>
