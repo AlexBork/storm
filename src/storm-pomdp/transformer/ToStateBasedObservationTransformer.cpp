@@ -8,18 +8,24 @@
 #include "storm/adapters/RationalNumberAdapter.h"
 #include "storm/exceptions/NotSupportedException.h"
 #include "storm/utility/builder.h"
+#include "storm/utility/constants.h"
+#include "storm/utility/graph.h"
 #include "storm/utility/macros.h"
 
 namespace storm::pomdp::transformer {
 
 template<typename ValueType>
 std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservationTransformer<ValueType>::transform(
-    storm::models::sparse::Mdp<ValueType> const& mdp, TransitionObservationFunction const& transitionObservationFunction, ObservationType initialObservation) {
+    storm::models::sparse::Mdp<ValueType> const& mdp, TransitionObservationFunction const& transitionObservationFunction, ObservationType initialObservation,
+    bool dropUnreachableStates) {
     STORM_LOG_WARN_COND(!mdp.hasStateValuations(), "State valuations are not preserved in transformation to state-based observations.");
     STORM_LOG_WARN_COND(!mdp.hasChoiceOrigins(), "Choice origins are not preserved in transformation to state-based observations.");
-    // TODO: add option to drop unreachable states
-
     auto const& transitionMatrix = mdp.getTransitionMatrix();
+    storm::storage::BitVector retainedStates(mdp.getNumberOfStates(), true);
+    if (dropUnreachableStates) {
+        retainedStates = storm::utility::graph::getReachableStates(transitionMatrix, mdp.getInitialStates(), retainedStates,
+                                                                   storm::storage::BitVector(mdp.getNumberOfStates(), false));
+    }
 
     // Create a vector that for each state contains the set of observations with which we may enter that state.
     std::vector<std::vector<ObservationType>> stateObservations(mdp.getNumberOfStates());
@@ -27,14 +33,17 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     for (auto const initState : mdp.getInitialStates()) {
         stateObservations[initState].push_back(initialObservation);
     }
-    // Now run over all transitions.
+    // Now run over the retained transitions, keeping the original state and local action indices.
     // Also gather all transition observations so that we do not have to query them twice
     std::vector<ObservationType> transitionTargetObservations;
     transitionTargetObservations.reserve(transitionMatrix.getEntryCount());
-    for (uint64_t state = 0; state < transitionMatrix.getRowGroupCount(); ++state) {
+    for (auto state : retainedStates) {
         auto const firstChoice = transitionMatrix.getRowGroupIndices()[state];
         for (auto choice : transitionMatrix.getRowGroupIndices(state)) {
             for (auto const& entry : transitionMatrix.getRow(choice)) {
+                if (dropUnreachableStates && storm::utility::isZero(entry.getValue())) {
+                    continue;
+                }
                 auto const obs = transitionObservationFunction(state, choice - firstChoice, entry.getColumn());
                 transitionTargetObservations.push_back(obs);
                 auto& obsSet = stateObservations[entry.getColumn()];
@@ -50,9 +59,8 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
     stateOffsets.reserve(mdp.getNumberOfStates() + 1);
     stateOffsets.push_back(0);
     for (uint64_t offset = 0; auto& obsSet : stateObservations) {
-        // A state with no incoming transition and no initial observation is unreachable. Give it
-        // one copy with an arbitrary observation so its choices, labels, and rewards remain intact.
-        if (obsSet.empty()) {
+        // When retaining unreachable states, give states without incoming transitions one copy.
+        if (!dropUnreachableStates && obsSet.empty()) {
             obsSet.push_back(initialObservation);
         }
         offset += obsSet.size();
@@ -70,6 +78,9 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
             matrixBuilder.newRowGroup(rowInResultMatrix);
             for (auto choice : transitionMatrix.getRowGroupIndices(state)) {
                 for (auto const& entry : transitionMatrix.getRow(choice)) {
+                    if (dropUnreachableStates && storm::utility::isZero(entry.getValue())) {
+                        continue;
+                    }
                     auto const targetObs = *transTargetObsIt;
                     auto const& targetObsSet = stateObservations[entry.getColumn()];
                     auto const findIt = std::find(targetObsSet.begin(), targetObsSet.end(), targetObs);
@@ -185,7 +196,7 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
 
 template<typename ValueType>
 std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservationTransformer<ValueType>::transformRewardAware(
-    storm::models::sparse::Pomdp<ValueType> const& pomdp, std::set<std::string> const& observableRewardModels) {
+    storm::models::sparse::Pomdp<ValueType> const& pomdp, std::set<std::string> const& observableRewardModels, bool dropUnreachableStates) {
     STORM_LOG_THROW(pomdp.getInitialStates().getNumberOfSetBits() == 1, storm::exceptions::NotSupportedException,
                     "The model must have exactly one initial state.");
     auto const initialObservation = pomdp.getObservation(pomdp.getInitialStates().getNextSetIndex(0));
@@ -229,7 +240,7 @@ std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> ToStateBasedObservation
             }
             return getOrAddObservationIndex(obs);
         },
-        initialObservation);
+        initialObservation, dropUnreachableStates);
     result->setIsCanonic(pomdp.isCanonic());
     return result;
 }
