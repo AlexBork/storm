@@ -1,5 +1,6 @@
 #include "storm-pomdp/beliefs/exploration/BeliefMdpBuilder.h"
 
+#include <algorithm>
 #include <unordered_map>
 
 #include "storm-pomdp/beliefs/storage/Belief.h"
@@ -11,6 +12,7 @@
 #include "storm/storage/SparseMatrix.h"
 #include "storm/storage/sparse/ModelComponents.h"
 
+#include "storm/exceptions/NotSupportedException.h"
 #include "storm/exceptions/UnexpectedException.h"
 
 namespace storm::pomdp::beliefs {
@@ -222,6 +224,8 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                             probabilityToTarget += successorValue;
                             probabilityToBottom += entry.probability - successorValue;
                         } else {
+                            STORM_LOG_THROW(isTotRew, storm::exceptions::UnexpectedException,
+                                            "Terminal reward accumulation requires an expected total reachability reward property.");
                             probabilityToTarget += entry.probability;
                             actionRewards[choice] += successorValue;
                         }

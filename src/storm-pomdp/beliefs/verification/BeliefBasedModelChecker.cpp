@@ -73,7 +73,7 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
 }
 
 /**
- * Creates a callback that recognizes property targets and optional small-gap cut-offs as terminal beliefs.
+ * Creates a callback that recognizes property targets and optional zero-gap cut-offs as terminal beliefs.
  *
  * Terminal beliefs receive their fixed value directly; all other unfinished beliefs remain explicit frontier states.
  */
@@ -83,10 +83,9 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
     storm::pomdp::storage::PreprocessingPomdpValueBounds<typename PomdpModelType::ValueType> const& valueBounds) {
     using PomdpValueType = typename PomdpModelType::ValueType;
     if (propertyInformation.kind == PropertyInformation::Kind::ExpectedTotalReachabilityReward) {
-        if (options.maxGapToCut.has_value()) {
-            // Terminate if the gap is small enough
-            auto const maxGapToCut = storm::utility::convertNumber<PomdpValueType>(options.maxGapToCut.value());
-            return [&propertyInformation, &valueBounds, maxGapToCut](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
+        if (options.cutZeroGap) {
+            // Terminate only if the preprocessing bounds have exactly zero gap.
+            return [&propertyInformation, &valueBounds](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
                 if (propertyInformation.targetObservations.contains(belief.observation())) {
                     return storm::utility::zero<BeliefMdpValueType>();
                 } else {
@@ -98,7 +97,7 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
                     for (auto const& valueList : valueBounds.lower) {
                         largestLower = storm::utility::max(largestLower, belief.template getWeightedSum<PomdpValueType>(valueList));
                     }
-                    if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
+                    if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= storm::utility::zero<PomdpValueType>()) {
                         if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
                             return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
                         } else {
@@ -125,10 +124,9 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
             // encoded only on the transition. The belief MDP builder consequently receives ordinary explored/frontier edges.
             return std::nullopt;
         };
-    } else if (options.maxGapToCut.has_value()) {
-        // Terminate if the gap is small enough
-        auto const maxGapToCut = storm::utility::convertNumber<PomdpValueType>(options.maxGapToCut.value());
-        return [&propertyInformation, &valueBounds, maxGapToCut](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
+    } else if (options.cutZeroGap) {
+        // Terminate only if the preprocessing bounds have exactly zero gap.
+        return [&propertyInformation, &valueBounds](BeliefType const& belief) -> std::optional<BeliefMdpValueType> {
             if (propertyInformation.targetObservations.contains(belief.observation())) {
                 return storm::utility::one<BeliefMdpValueType>();
             } else {
@@ -140,7 +138,7 @@ typename BeliefExploration<BeliefMdpValueType, PomdpModelType, BeliefType>::Term
                 for (auto const& valueList : valueBounds.lower) {
                     largestLower = storm::utility::max(largestLower, belief.template getWeightedSum<PomdpValueType>(valueList));
                 }
-                if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= maxGapToCut) {
+                if (storm::utility::abs<PomdpValueType>(smallestUpper - largestLower) <= storm::utility::zero<PomdpValueType>()) {
                     if constexpr (std::is_same_v<PomdpValueType, BeliefMdpValueType>) {
                         return propertyInformation.dir == solver::OptimizationDirection::Maximize ? largestLower : smallestUpper;
                     } else {

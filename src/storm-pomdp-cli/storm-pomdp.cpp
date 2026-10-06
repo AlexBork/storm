@@ -287,9 +287,7 @@ bool performBeliefExploration(std::shared_ptr<storm::models::sparse::Pomdp<Value
     if (belExplSettings.getExplorationTimeLimit() != 0) {
         revisedOptions.maxExplorationTime = belExplSettings.getExplorationTimeLimit();
     }
-    if (belExplSettings.isCutZeroGapSet()) {
-        revisedOptions.maxGapToCut = storm::utility::zero<BeliefMDPType>();
-    }
+    revisedOptions.cutZeroGap = belExplSettings.isCutZeroGapSet();
 
     std::shared_ptr<storm::models::sparse::Pomdp<ValueType>> preprocessedPomdpPtr = pomdp;
 
