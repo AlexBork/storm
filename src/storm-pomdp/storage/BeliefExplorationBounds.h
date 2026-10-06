@@ -82,7 +82,7 @@ struct PreprocessingPomdpValueBounds {
     PreprocessingPomdpValueBounds<OutputValueType> toValueType() {
         PreprocessingPomdpValueBounds<OutputValueType> convertedBounds;
         for (auto const& vec : lower) {
-            convertedBounds.lower.push_back(convertedBounds.lower.push_back(storm::utility::vector::convertNumericVector<OutputValueType>(vec));
+            convertedBounds.lower.push_back(storm::utility::vector::convertNumericVector<OutputValueType>(vec));
         }
         for (auto const& vec : upper) {
             convertedBounds.upper.push_back(storm::utility::vector::convertNumericVector<OutputValueType>(vec));
