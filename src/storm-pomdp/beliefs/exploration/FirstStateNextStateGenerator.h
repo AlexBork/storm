@@ -204,6 +204,12 @@ struct NextStateGeneratorHandle {
                     }
                 }
             });
+            if constexpr (!storm::NumberTraits<BeliefValueType>::IsExact || !storm::NumberTraits<typename PomdpType::ValueType>::IsExact) {
+                if (successorObservations.size() == 1) {
+                    // The observation probability was forced to one, so normalize the successor belief separately.
+                    builder.normalize();
+                }
+            }
             applyPostAbstraction(builder.build(), static_cast<BeliefValueType>(successorObsValue.second * transitionProbability),
                                  std::forward<CallBackArgs const>(additionalCallbackArgs)...);
         }
