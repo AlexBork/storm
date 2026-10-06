@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "storm-pomdp/beliefs/storage/Belief.h"
 
@@ -181,6 +183,8 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
     }
 
     storm::storage::SparseMatrixBuilder<BeliefMdpValueType> transitionBuilder(numChoices, numStates, 0, true, true, numStates);
+    // Keep source indices so probabilities and reward vectors share the same successor ordering without copying the data.
+    std::vector<std::pair<uint64_t, uint64_t>> rowSuccessors;
     // Treat explored beliefs
     for (uint64_t state = 0; state < numStates - numExtraStates; ++state) {
         uint64_t choice = explorationInformation.matrix.rowGroupIndices[state];
@@ -196,21 +200,13 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
             }
             auto probabilityToBottom = storm::utility::zero<BeliefMdpValueType>();
             auto probabilityToTarget = storm::utility::zero<BeliefMdpValueType>();
+            rowSuccessors.clear();
             for (uint64_t entryIndex = explorationInformation.matrix.rowIndications[choice];
                  entryIndex < explorationInformation.matrix.rowIndications[choice + 1]; ++entryIndex) {
                 auto const& entry = explorationInformation.matrix.transitions[entryIndex];
                 if (auto explIt = explorationInformation.exploredBeliefs.find(entry.targetBelief); explIt != explorationInformation.exploredBeliefs.end()) {
                     // Transition to explored belief
-                    transitionBuilder.addNextValue(choice, explIt->second, entry.probability);
-                    if constexpr (extraDataCompatibleWithRewardAwareness) {
-                        if (isRewBndReachProb) {
-                            for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
-                                if (!storm::utility::isZero(entry.data[i])) {
-                                    transitionRewardBuilderVector.at(i).addNextValue(choice, explIt->second, entry.data[i]);
-                                }
-                            }
-                        }
-                    }
+                    rowSuccessors.emplace_back(explIt->second, entryIndex);
                 } else {
                     // Transition to unexplored belief (either terminal or cut-off)
                     BeliefMdpValueType successorValue;
@@ -233,16 +229,7 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                         // Transition to frontier belief
                         auto const frontierIt = frontierBeliefToStateMap.find(entry.targetBelief);
                         STORM_LOG_ASSERT(frontierIt != frontierBeliefToStateMap.end(), "Unknown frontier belief.");
-                        transitionBuilder.addNextValue(choice, frontierIt->second, entry.probability);
-                        if constexpr (extraDataCompatibleWithRewardAwareness) {
-                            if (isRewBndReachProb) {
-                                for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
-                                    if (!storm::utility::isZero(entry.data[i])) {
-                                        transitionRewardBuilderVector.at(i).addNextValue(choice, frontierIt->second, entry.data[i]);
-                                    }
-                                }
-                            }
-                        }
+                        rowSuccessors.emplace_back(frontierIt->second, entryIndex);
                     }
                 }
                 if constexpr (clippingUsed) {
@@ -273,7 +260,24 @@ std::pair<std::shared_ptr<models::sparse::Mdp<BeliefMdpValueType>>, std::unorder
                     }
                 }
             }
-            // Add transition to bottom/target state if necessary
+            // Sort each choice once by its final state IDs, preserving source order for duplicate successors.
+            if (!std::is_sorted(rowSuccessors.begin(), rowSuccessors.end())) {
+                std::sort(rowSuccessors.begin(), rowSuccessors.end());
+            }
+            for (auto const& [successorState, entryIndex] : rowSuccessors) {
+                auto const& entry = explorationInformation.matrix.transitions[entryIndex];
+                transitionBuilder.addNextValue(choice, successorState, entry.probability);
+                if constexpr (extraDataCompatibleWithRewardAwareness) {
+                    if (isRewBndReachProb) {
+                        for (uint64_t i = 0; i < propertyInformation.rewardBounds.size(); ++i) {
+                            if (!storm::utility::isZero(entry.data[i])) {
+                                transitionRewardBuilderVector.at(i).addNextValue(choice, successorState, entry.data[i]);
+                            }
+                        }
+                    }
+                }
+            }
+            // Sink state IDs follow all ordinary successors, so these insertions remain ordered.
             if (!storm::utility::isZero(probabilityToTarget)) {
                 transitionBuilder.addNextValue(choice, targetState, probabilityToTarget);
             }
