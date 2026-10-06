@@ -15,7 +15,7 @@ struct BeliefBasedModelCheckerOptions {
     bool buildChoiceLabeling = true;
     bool useClipping = false;
 
-    ExplorationQueueOrder explorationQueueOrder = ExplorationQueueOrder::Unordered;
+    ExplorationQueueOrder explorationQueueOrder = ExplorationQueueOrder::FIFO;
 
     // Clipping abstraction parameters
     std::optional<std::vector<uint64_t>> clippingResolutions;
