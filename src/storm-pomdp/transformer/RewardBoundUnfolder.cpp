@@ -97,19 +97,21 @@ std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model
         if (boundedUntilFormula.hasUpperBound(formulaDim)) {
             STORM_LOG_THROW(boundedUntilFormula.hasIntegerUpperBound(formulaDim), storm::exceptions::NotSupportedException,
                             "Bound " << formulaDim << " is not an integer");  // might support rational via scaling (how to scale levelWidth?)
-            int64_t const threshold =
-                boundedUntilFormula.getUpperBound(formulaDim).evaluateAsInt() - (boundedUntilFormula.isUpperBoundStrict(formulaDim) ? 1ul : 0ul);
-            STORM_LOG_THROW(threshold >= 0, storm::exceptions::NotSupportedException,
+            int64_t const bound = boundedUntilFormula.getUpperBound(formulaDim).evaluateAsInt();
+            int64_t const adjustment = boundedUntilFormula.isUpperBoundStrict(formulaDim) ? int64_t{1} : int64_t{0};
+            STORM_LOG_THROW(bound >= adjustment, storm::exceptions::NotSupportedException,
                             "Upper reward bound in dimension " << formulaDim << " is not satisfiable.");
+            int64_t const threshold = bound - adjustment;
             dimensions.push_back(
                 Dimension<ValueType>{Dimension<ValueType>::Relation::lessEqual, threshold, levelWidth, getFreshIdentifier(), formulaDim, rewardModel});
         }
         if (boundedUntilFormula.hasLowerBound(formulaDim)) {
             STORM_LOG_THROW(boundedUntilFormula.hasIntegerLowerBound(formulaDim), storm::exceptions::NotSupportedException,
                             "Bound " << formulaDim << " is not an integer");  // might support rational via scaling (how to scale levelWidth?)
-            int64_t const threshold =
-                boundedUntilFormula.getLowerBound(formulaDim).evaluateAsInt() - (boundedUntilFormula.isLowerBoundStrict(formulaDim) ? 0ul : 1ul);
-            if (threshold >= 0) {
+            int64_t const bound = boundedUntilFormula.getLowerBound(formulaDim).evaluateAsInt();
+            int64_t const adjustment = boundedUntilFormula.isLowerBoundStrict(formulaDim) ? int64_t{0} : int64_t{1};
+            if (bound >= adjustment) {
+                int64_t const threshold = bound - adjustment;
                 dimensions.push_back(
                     Dimension<ValueType>{Dimension<ValueType>::Relation::greater, threshold, levelWidth, getFreshIdentifier(), formulaDim, rewardModel});
             } else {
@@ -287,8 +289,11 @@ ExplorationResult<ValueType> exploreUnfolding(storm::models::sparse::Model<Value
             // Abstract the successor epoch. Ensures that we only reach a finite set of epochs.
             applyEpochAbstraction(successorEpoch, dimensions);
             for (auto const& entry : ogMatrix.getRow(choice)) {
-                auto successorInUnfolding = processNewStateEpoch(entry.getColumn(), successorEpoch);
+                if (storm::utility::isZero(entry.getValue())) {
+                    continue;
+                }
                 STORM_LOG_ASSERT(entry.getValue() > storm::utility::zero<ValueType>(), "Transition probabilities must be positive.");
+                auto successorInUnfolding = processNewStateEpoch(entry.getColumn(), successorEpoch);
                 matrixBuilder.addNextValue(numChoicesInUnfolding, successorInUnfolding, entry.getValue());
             }
             ++numChoicesInUnfolding;
