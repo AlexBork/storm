@@ -149,11 +149,20 @@ template<typename ValueType>
 EpochType computeSuccessorEpoch(StateIdType currentState, EpochType const& currentEpoch, ChoiceIdType choice,
                                 std::vector<Dimension<ValueType>> const& dimensions) {
     EpochType successorEpoch = currentEpoch;
+    // Use an exclusive upper limit because INT64_MAX rounds up to 2^63 when converted to double.
+    ValueType const rewardLimit = -storm::utility::convertNumber<ValueType>(std::numeric_limits<int64_t>::min());
     for (auto eIt = successorEpoch.begin(); auto const& dim : dimensions) {
         auto const& rew = dim.rewardModel;
         ValueType const reward = (rew.hasStateRewards() ? rew.getStateReward(currentState) : storm::utility::zero<ValueType>()) +
                                  (rew.hasStateActionRewards() ? rew.getStateActionReward(choice) : storm::utility::zero<ValueType>());
-        *eIt -= storm::utility::convertNumber<uint64_t>(reward);
+        STORM_LOG_THROW(reward >= storm::utility::zero<ValueType>() && reward < rewardLimit, storm::exceptions::NotSupportedException,
+                        "Combined reward at state " << currentState << ", choice " << choice << " in dimension " << dim.originalFormulaDimension
+                                                    << " is outside the nonnegative int64_t range.");
+        int64_t const integerReward = storm::utility::convertNumber<int64_t>(reward);
+        STORM_LOG_THROW(*eIt >= std::numeric_limits<int64_t>::min() + integerReward, storm::exceptions::NotSupportedException,
+                        "Successor epoch at state " << currentState << ", choice " << choice << " in dimension " << dim.originalFormulaDimension
+                                                    << " would be below INT64_MIN.");
+        *eIt -= integerReward;
         ++eIt;
     }
     return successorEpoch;
@@ -164,7 +173,7 @@ void computeLevelReward(EpochType const& successorEpoch, std::vector<Dimension<V
     for (uint64_t dimIndex = 0; dimIndex < dimensions.size(); ++dimIndex) {
         auto const lvlWidth = dimensions[dimIndex].levelWidth;
         if (lvlWidth != 0) {
-            auto const reward = storm::utility::ceil<ValueType>(storm::utility::convertNumber<ValueType>(-successorEpoch[dimIndex]) /
+            auto const reward = storm::utility::ceil<ValueType>(-storm::utility::convertNumber<ValueType>(successorEpoch[dimIndex]) /
                                                                 storm::utility::convertNumber<ValueType>(lvlWidth));
             STORM_LOG_ASSERT(reward >= storm::utility::zero<ValueType>(), "Expected non-negative level reward, got "
                                                                               << reward << ". Succ epoch is " << successorEpoch[dimIndex] << " and lvlWidth is "
