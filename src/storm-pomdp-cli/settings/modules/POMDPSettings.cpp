@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <limits>
+#include <ranges>
 
 #include "storm/settings/ArgumentBuilder.h"
 #include "storm/settings/Option.h"
