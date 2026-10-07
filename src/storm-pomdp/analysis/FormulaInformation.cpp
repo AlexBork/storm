@@ -157,7 +157,6 @@ FormulaInformation getFormulaInformation(PomdpType const& pomdp, storm::logic::P
         storm::logic::BoundedUntilFormula const& boundedUntilFormula = subformula.asBoundedUntilFormula();
         STORM_LOG_THROW(!boundedUntilFormula.hasMultiDimensionalSubformulas(), storm::exceptions::NotSupportedException,
                         "Reward-bounded POMDP properties with dimension-specific state subformulas are not supported.");
-        // TODO: Support more general bounded until formulae
         for (uint64_t i = 0; i < boundedUntilFormula.getDimension(); ++i) {
             STORM_LOG_THROW(boundedUntilFormula.getLeftSubformula(i).isTrueFormula(), storm::exceptions::NotSupportedException,
                             "Reward-bounded until properties for POMDPs currently require 'true' as the left-hand side, i.e., they must be reward-bounded "
