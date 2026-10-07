@@ -80,7 +80,10 @@ class FirstStateNextStateGenerator {
     bool hasRewardModel() const;
     void unsetRewardModel();
 
-    /** @return the initial belief induced by the POMDP's initial-state distribution. */
+    /**
+     * @return the belief assigning probability one to the POMDP's single initial state.
+     * @throws storm::exceptions::NotSupportedException if the POMDP does not have exactly one initial state.
+     */
     BeliefType computeInitialBelief() const;
 
     /** @return the number of observation-compatible actions in @p belief. */
