@@ -43,6 +43,35 @@ struct Dimension {
 };
 
 /*!
+ * Checks whether all individual and combined rewards fit into int64_t, assuming nonnegative integer rewards.
+ */
+template<typename ValueType>
+bool rewardsFitInt64(storm::models::sparse::Model<ValueType> const& model, storm::models::sparse::StandardRewardModel<ValueType> const& rewardModel) {
+    // Use an exclusive upper limit because INT64_MAX rounds up to 2^63 when converted to double.
+    ValueType const rewardLimit = -storm::utility::convertNumber<ValueType>(std::numeric_limits<int64_t>::min());
+    auto const rewardFitsInt64 = [&rewardLimit](ValueType const& reward) { return reward < rewardLimit; };
+    if (rewardModel.hasStateRewards() && !std::all_of(rewardModel.getStateRewardVector().begin(), rewardModel.getStateRewardVector().end(), rewardFitsInt64)) {
+        return false;
+    }
+    if (rewardModel.hasStateActionRewards() &&
+        !std::all_of(rewardModel.getStateActionRewardVector().begin(), rewardModel.getStateActionRewardVector().end(), rewardFitsInt64)) {
+        return false;
+    }
+    // Individual rewards may fit into int64_t even though their sum does not. Check all original choices, including unreachable ones.
+    if (rewardModel.hasStateRewards() && rewardModel.hasStateActionRewards()) {
+        for (StateIdType state = 0; state < model.getNumberOfStates(); ++state) {
+            for (auto const choice : model.getTransitionMatrix().getRowGroupIndices(state)) {
+                ValueType const reward = rewardModel.getStateReward(state) + rewardModel.getStateActionReward(choice);
+                if (!rewardFitsInt64(reward)) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+/*!
  * Extracts the dimension information from the input formula.
  * Also performs various sanity/compatibility checks.
  */
@@ -83,6 +112,8 @@ std::vector<Dimension<ValueType>> extractDimensions(storm::models::sparse::Model
         // increase an epoch indefinitely and therefore make the unfolding infinite.
         STORM_LOG_THROW(!rewardModel.hasNegativeRewards(), storm::exceptions::NotSupportedException,
                         "Reward model " << rewardModelName << " contains negative rewards. These are currently unsupported.");
+        STORM_LOG_ASSERT(rewardsFitInt64(model, rewardModel),
+                         "Rewards in reward model " << rewardModelName << " for bound reference " << formulaDim << " exceed INT64_MAX.");
 
         // Helper function to generate fresh identifiers (either for level reward or active label)
         auto getFreshIdentifier = [&]() {
@@ -149,19 +180,13 @@ template<typename ValueType>
 EpochType computeSuccessorEpoch(StateIdType currentState, EpochType const& currentEpoch, ChoiceIdType choice,
                                 std::vector<Dimension<ValueType>> const& dimensions) {
     EpochType successorEpoch = currentEpoch;
-    // Use an exclusive upper limit because INT64_MAX rounds up to 2^63 when converted to double.
-    ValueType const rewardLimit = -storm::utility::convertNumber<ValueType>(std::numeric_limits<int64_t>::min());
     for (auto eIt = successorEpoch.begin(); auto const& dim : dimensions) {
         auto const& rew = dim.rewardModel;
         ValueType const reward = (rew.hasStateRewards() ? rew.getStateReward(currentState) : storm::utility::zero<ValueType>()) +
                                  (rew.hasStateActionRewards() ? rew.getStateActionReward(choice) : storm::utility::zero<ValueType>());
-        STORM_LOG_THROW(reward >= storm::utility::zero<ValueType>() && reward < rewardLimit, storm::exceptions::NotSupportedException,
-                        "Combined reward at state " << currentState << ", choice " << choice << " in dimension " << dim.originalFormulaDimension
-                                                    << " is outside the nonnegative int64_t range.");
         int64_t const integerReward = storm::utility::convertNumber<int64_t>(reward);
-        STORM_LOG_THROW(*eIt >= std::numeric_limits<int64_t>::min() + integerReward, storm::exceptions::NotSupportedException,
-                        "Successor epoch at state " << currentState << ", choice " << choice << " in dimension " << dim.originalFormulaDimension
-                                                    << " would be below INT64_MIN.");
+        // Initial epochs are nonnegative and abstracted epochs are at least -1. Combined rewards are assumed to be
+        // in [0, INT64_MAX] (asserted in extractDimensions), so subtraction cannot produce a value below INT64_MIN.
         *eIt -= integerReward;
         ++eIt;
     }
